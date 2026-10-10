@@ -67,6 +67,11 @@ each refresh without blanking the list. ctrl-r refreshes now, Esc leaves. Withou
 back to `watch`. kubectl output is colored through [kubecolor](https://github.com/kubecolor/kubecolor)
 when it is on PATH (`go install github.com/kubecolor/kubecolor@v0.8.0`).
 
+**ctrl-z** (as in k9s) toggles to faulty rows only, marked `[faults only]` in the header: a STATUS
+other than Running/Completed/Succeeded, or a READY count short of its total (which also catches
+deployments and statefulsets). The filter is `cmdmode faults`, which kview pipes the command
+through while the toggle is on.
+
 **Enter** on a row puts a command for that resource on your next prompt, e.g. Enter on
 `kube-system coredns-x ...` gives `kubectl get -n kube-system pods coredns-x`, ready for Alt-m.
 kview writes the line to `$CMDMODE_PICK_FILE` and the plugin's precmd hook loads it with

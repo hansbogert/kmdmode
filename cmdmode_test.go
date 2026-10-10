@@ -110,6 +110,45 @@ func TestPick(t *testing.T) {
 	}
 }
 
+func TestFaults(t *testing.T) {
+	in := strings.Join([]string{
+		"\x1b[1mNAMESPACE   NAME   READY   STATUS             RESTARTS   NOMINATED NODE",
+		"ns          ok     2/2     \x1b[32mRunning\x1b[0m            0          <none>",
+		"ns          crash  0/1     CrashLoopBackOff   7          <none>",
+		"ns          half   1/2     Running            0          <none>",
+		"ns          job    0/1     Completed          0          <none>",
+		"ns          wait   0/1     Pending            0          <none>",
+	}, "\n")
+	var out strings.Builder
+	if err := faults(strings.NewReader(in), &out); err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, l := range strings.Split(strings.TrimSpace(out.String()), "\n")[1:] {
+		names = append(names, strings.Fields(l)[1])
+	}
+	if got := strings.Join(names, " "); got != "crash half wait" {
+		t.Errorf("faulty rows: got %q, want %q", got, "crash half wait")
+	}
+	if !strings.HasSuffix(strings.Split(out.String(), "\n")[0], "[faults only]") {
+		t.Errorf("header not marked: %q", strings.Split(out.String(), "\n")[0])
+	}
+
+	// Deployments have READY but no STATUS.
+	out.Reset()
+	faults(strings.NewReader("NAME READY UP-TO-DATE\nok 3/3 3\nshort 1/3 3\n"), &out)
+	if got := out.String(); !strings.Contains(got, "short") || strings.Contains(got, "ok 3/3") {
+		t.Errorf("deployments: got %q", got)
+	}
+
+	// Not a table: everything passes through, header unmarked.
+	out.Reset()
+	faults(strings.NewReader("error: You must be logged in\nmore\n"), &out)
+	if got := out.String(); got != "error: You must be logged in\nmore\n" {
+		t.Errorf("non-table: got %q", got)
+	}
+}
+
 func check(t *testing.T, key, in, want string, out []string, ok bool) {
 	t.Helper()
 	got := strings.Join(out, " ")

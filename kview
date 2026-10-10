@@ -2,6 +2,7 @@
 # kview CMD...: a k9s-style live view of CMD's output. Scroll and filter it in fzf with the first
 # line pinned as the header; CMD re-runs $KVIEW_INTERVAL (2) seconds after each refresh, and
 # reload-sync keeps the old list on screen until the new one is complete. ctrl-r refreshes now,
+# ctrl-z shows only faulty rows (cmdmode faults),
 # Enter puts a command for the picked row (e.g. "kubectl get -n NS pods NAME") on the next prompt.
 # kubectl output is colored through kubecolor when it is installed.
 # An executable rather than a plugin function, so shells loaded before an update and history
@@ -17,16 +18,22 @@ interval=${KVIEW_INTERVAL:-2}
 if (( ! $+commands[fzf] )); then
   exec watch -n $interval -- $cmd
 fi
-row=$(FZF_DEFAULT_COMMAND=$cmd fzf --ansi --header-lines=1 --layout=reverse --no-sort --info=inline \
-  --prompt="$* > " \
-  --bind "load:reload-sync(sleep $interval; $cmd)" \
-  --bind "ctrl-r:reload-sync($cmd)")
+# ctrl-z (as in k9s) toggles a filter down to faulty rows; the state is whether $faults exists.
+bin=${0:A:h}/bin/cmdmode
+faults=$(mktemp -u)
+trap 'rm -f $faults' EXIT
+src="$cmd | { if [ -e $faults ]; then $bin faults; else cat; fi; }"
+row=$(FZF_DEFAULT_COMMAND=$src fzf --ansi --header-lines=1 --layout=reverse --no-sort --info=inline \
+  --prompt="$* > " --header="enter: pick  ctrl-z: faults only  ctrl-r: refresh  esc: quit" \
+  --bind "load:reload-sync(sleep $interval; $src)" \
+  --bind "ctrl-r:reload-sync($src)" \
+  --bind "ctrl-z:execute-silent([ -e $faults ] && rm -f $faults || touch $faults)+reload-sync($src)")
 rc=$?
 (( rc == 130 )) && exit 0  # Esc is the normal way out, not a failure
 (( rc )) && exit $rc
 # Enter: turn the row into a command for it. The plugin's precmd hook puts what lands in
 # $CMDMODE_PICK_FILE on the next prompt; without the plugin, print it instead.
-line=$(${0:A:h}/bin/cmdmode pick -- ${(q-)@} <<<$row) || line=$row
+line=$($bin pick -- ${(q-)@} <<<$row) || line=$row
 if [[ -n $CMDMODE_PICK_FILE ]]; then
   print -r -- $line >| $CMDMODE_PICK_FILE
 else
