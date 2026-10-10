@@ -15,7 +15,13 @@ check() {  # check LINE KEY WANT
   zpty -w -n t "$line"$'\em'"$key"$'\x14'
   local i
   for i in {1..50}; do [[ -s $out ]] && break; sleep 0.05; done
+  local tty chunk
+  while zpty -rt t chunk; do tty+=$chunk; done
   zpty -d t
+  if [[ $tty == *(bad option|command not found|_cmdmode)* ]]; then
+    print "FAIL ${(q)line} + $key: zsh error on the terminal: ${(q)tty}"
+    fail=1
+  fi
   if [[ $(<$out) == "$want" ]]; then
     print "ok   ${(q)line} + $key"
   else

@@ -26,7 +26,7 @@ _cmdmode_enter() {
   done
   _cmdmode_prev_keymap=$KEYMAP
   zle -K cmdmode
-  zle -M "-- CMD -- ${msg}[Esc] cancel"
+  zle -M "cmdmode: ${msg}[Esc] cancel"
 }
 
 _cmdmode_dispatch() {
