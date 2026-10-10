@@ -34,7 +34,7 @@ check() {  # check LINE KEYS WANT [TEXT the terminal must show]
 
 check 'kubectl get pods -n ns pod1 ' H 'kubectl logs -n ns pod1 ' 'cmdmode [kubectl logs]  [G] get'
 check "kubectl get pod 'my pod' -o wide" h "kubectl logs 'my pod'"
-check 'kubectl get deploy d -n ns' D 'kubectl describe -n ns deploy d' 'cmdmode [kubectl get]  [D] describe'
+check 'kubectl get deploy d -n ns' I 'kubectl describe -n ns deploy d' 'cmdmode [kubectl get]  [I] describe  [D] delete'
 check 'kubectl get deploy d' H 'kubectl get deploy d' "no 'H' here"
 check 'kgp pod1' h 'kubectl logs pod1'
 check 'kubectl get pods p' $'\e'x 'kubectl get pods px'

@@ -49,12 +49,20 @@ The helper rewrites the last simple command that has an action, so env prefixes
 
 ## Modes
 
-| Mode               | Actions                                   | Options (after `-`)                                    |
-|--------------------|-------------------------------------------|--------------------------------------------------------|
-| `kubectl get`      | H logs (one pod, or pods `-l`), D describe | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels` |
-| `kubectl logs`     | G get, D describe                         | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
-| `kubectl describe` | H logs (as for get), G get                | e `--show-events=false`                                |
-| any other `kubectl ...` | O overview                           |                                                        |
+| Mode               | Actions                                       | Options (after `-`)                                    |
+|--------------------|-----------------------------------------------|--------------------------------------------------------|
+| `kubectl get`      | H logs, I describe, D delete, O overview      | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels` |
+| `kubectl logs`     | G get, I describe, D delete, O overview       | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
+| `kubectl describe` | H logs, G get, D delete, O overview           | e `--show-events=false`                                |
+| `kubectl delete`   | H logs, G get, I describe, O overview         |                                                        |
+| any other `kubectl ...` | O overview                               |                                                        |
+
+I is describe as in "inspect", leaving D for delete. **D is offered only when the line names
+specific resources** (`pods p`, `deploy/d`), never for a bare type, `-l`, `-A`, `--all` or `-f`,
+where it would delete everything that matches; from `logs`, only for a plain pod name, since
+`logs deploy/d` reads one pod and deleting the deployment is a bigger step. Like every action, D
+only rewrites the line: nothing runs until you press Enter. H is offered for exactly one pod, or
+pods picked by `-l`.
 
 **O overview** is in every kubectl mode: a k9s-style live list of the line's resource type across
 all namespaces, `kview kubectl get <type> -A -o wide`. The type is the one `get`/`describe`/

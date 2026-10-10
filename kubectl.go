@@ -35,6 +35,12 @@ var kubectlFlagTables = map[string]flagTable{
 		- --limit-bytes value; - --max-log-requests value; - --pod-running-timeout value
 		- --prefix bool; -p --previous bool; -l --selector value; - --since value
 		- --since-time value; - --tail value; - --timestamps bool`),
+	"delete": parseFlagTable(`
+		- --all bool; -A --all-namespaces bool; - --cascade value; - --dry-run value
+		- --field-selector value; -f --filename value; - --force bool; - --grace-period value
+		- --ignore-not-found bool; -i --interactive bool; -k --kustomize value; - --now bool
+		-o --output value; - --raw value; -R --recursive bool; -l --selector value
+		- --timeout value; - --wait bool`),
 	"describe": parseFlagTable(`
 		-A --all-namespaces bool; - --chunk-size value; -f --filename value
 		-k --kustomize value; -R --recursive bool; -l --selector value; - --show-events bool`),
@@ -225,23 +231,31 @@ func kubectlMode(cmd []string) (mode, bool) {
 	}
 	m := mode{name: strings.TrimSpace(bare(k.words[0]) + " " + k.sub)}
 	switch k.sub {
-	case "get", "describe":
+	case "get", "describe", "delete":
 		if logArgs, ok := podLogTarget(k); ok {
 			m.actions = append(m.actions, action{"H", "logs", func() []string {
 				return k.rebuild("logs", logArgs...)
 			}})
 		}
-		if len(k.pos) > 0 || k.has("--filename", "--kustomize") {
-			other := map[string]string{"get": "describe", "describe": "get"}[k.sub]
-			m.actions = append(m.actions, action{strings.ToUpper(other[:1]), other, func() []string {
-				return k.rebuild(other, k.pos...)
+		for _, v := range resourceVerbs {
+			if v.sub == k.sub || len(k.pos) == 0 && !k.has("--filename", "--kustomize") ||
+				v.sub == "delete" && !namesResources(k) {
+				continue
+			}
+			m.actions = append(m.actions, action{v.key, v.sub, func() []string {
+				// delete's -o only takes "name"; get's -o wide or yaml would fail there.
+				return k.without("--output").rebuild(v.sub, k.pos...)
 			}})
 		}
 	case "logs":
 		if args, ok := logsResource(k); ok {
-			for _, sub := range []string{"get", "describe"} {
-				m.actions = append(m.actions, action{strings.ToUpper(sub[:1]), sub, func() []string {
-					return k.rebuild(sub, args...)
+			for _, v := range resourceVerbs {
+				// "logs deploy/d" reads a pod of d; deleting d itself is too far a leap.
+				if v.sub == "delete" && args[0] != "pod" {
+					continue
+				}
+				m.actions = append(m.actions, action{v.key, v.sub, func() []string {
+					return k.rebuild(v.sub, args...)
 				}})
 			}
 		}
@@ -251,6 +265,20 @@ func kubectlMode(cmd []string) (mode, bool) {
 		m.options = append(m.options, k.option(o))
 	}
 	return m, true
+}
+
+// Subcommands that address resources alike ("TYPE NAME..." or "TYPE/NAME"), so a line converts
+// between them. I is describe as in "inspect", leaving D for delete.
+var resourceVerbs = []struct{ key, sub string }{{"G", "get"}, {"I", "describe"}, {"D", "delete"}}
+
+// namesResources reports whether the line names specific resources. Delete is offered only then:
+// a selector, -A, a file or a bare type would make it delete everything that matches.
+func namesResources(k kubectlCmd) bool {
+	if k.has("--all", "--all-namespaces", "--selector", "--field-selector", "--filename",
+		"--kustomize") {
+		return false
+	}
+	return len(k.pos) >= 2 || len(k.pos) == 1 && strings.Contains(k.pos[0], "/")
 }
 
 // Subcommands whose first argument is a resource type (or TYPE/NAME).
