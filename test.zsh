@@ -114,5 +114,16 @@ KVIEW_INTERVAL=0.3 $root/kview kubectl $c; print exit=\$?" >| $kv
     print -r -- $screen | sed "s/\x1b\[[0-9;?]*[a-zA-Z]//g" | tr "\r" "\n" | grep -av "^\s*$" | tail -4 | cut -c1-100
   fi
 done
+# A describe document refreshes like a table does.
+print -r -- $'#!/bin/sh\necho "Name: p"; echo "Tick: $(date +%s%N)"' >| $fake/kubectl
+print -r -- "stty rows 15 cols 80; export PATH=$fake:\$PATH
+KVIEW_INTERVAL=0.5 $root/kview kubectl describe pod p" >| $kv
+ticks=$( (sleep 3; printf '\e'; sleep 1) | timeout 10 script -qfc "zsh -f $kv" /dev/null |
+  grep -aoE 'Tick: [0-9]+' | sort -u | wc -l)
+if (( ticks >= 3 )); then
+  print "ok   kview describe refreshes: $ticks versions seen"
+else
+  print "FAIL kview describe refreshes: $ticks versions seen"; fail=1
+fi
 rm -rf $out $kv $fake
 exit $fail
