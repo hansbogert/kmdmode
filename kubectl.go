@@ -4,148 +4,291 @@ import "strings"
 
 var kubectlNames = set("kubectl", "k", "kubecolor")
 
-// Global flags (kubectl options) say which cluster to talk to and as whom, so every subcommand
-// accepts them and they carry over. Lists taken from kubectl v1.37.1.
-var kubectlGlobalValueFlags = []string{
-	"--as", "--as-group", "--as-uid", "--as-user-extra", "--cache-dir", "--certificate-authority",
-	"--client-certificate", "--client-key", "--cluster", "--context", "--kubeconfig", "--kuberc",
-	"--log-flush-frequency", "-n", "--namespace", "--password", "--profile", "--profile-output",
-	"--proxy-url", "--request-timeout", "-s", "--server", "--tls-server-name", "--token", "--user",
-	"--username", "-v", "--v", "--vmodule",
+// Flag tables from kubectl v1.37.1: "short long kind" per flag, short "-" when there is none.
+// Regenerate a subcommand's table from the "--long=default:" lines of "kubectl <sub> --help";
+// the global one comes from "kubectl options".
+var kubectlFlagTables = map[string]flagTable{
+	"": parseFlagTable(`
+		- --as value; - --as-group value; - --as-uid value; - --as-user-extra value
+		- --cache-dir value; - --certificate-authority value; - --client-certificate value
+		- --client-key value; - --cluster value; - --context value; - --disable-compression bool
+		- --insecure-skip-tls-verify bool; - --kubeconfig value; - --kuberc value
+		- --log-flush-frequency value; - --match-server-version bool; -n --namespace value
+		- --password value; - --profile value; - --profile-output value; - --proxy-url value
+		- --request-timeout value; -s --server value; - --tls-server-name value; - --token value
+		- --user value; - --username value; -v --v value; - --vmodule value
+		- --warnings-as-errors bool`),
+	"get": parseFlagTable(`
+		-A --all-namespaces bool; - --allow-missing-template-keys bool; - --chunk-size value
+		- --field-selector value; -f --filename value; - --ignore-not-found bool
+		-k --kustomize value; -L --label-columns value; - --no-headers bool; -o --output value
+		- --output-watch-events bool; - --raw value; -R --recursive bool; -l --selector value
+		- --server-print bool; - --show-kind bool; - --show-labels bool
+		- --show-managed-fields bool; - --sort-by value; - --subresource value
+		- --template value; -w --watch bool; - --watch-only bool`),
+	"logs": parseFlagTable(`
+		- --all-containers bool; - --all-pods bool; -c --container value; -f --follow bool
+		- --ignore-errors bool; - --insecure-skip-tls-verify-backend bool
+		- --limit-bytes value; - --max-log-requests value; - --pod-running-timeout value
+		- --prefix bool; -p --previous bool; -l --selector value; - --since value
+		- --since-time value; - --tail value; - --timestamps bool`),
+	"describe": parseFlagTable(`
+		-A --all-namespaces bool; - --chunk-size value; -f --filename value
+		-k --kustomize value; -R --recursive bool; -l --selector value; - --show-events bool`),
 }
 
-var kubectlGlobalFlags = set(append([]string{
-	"--disable-compression", "--insecure-skip-tls-verify", "--match-server-version",
-	"--warnings-as-errors",
-}, kubectlGlobalValueFlags...)...)
-
-// Flags that take a separate value word; needed to tell a flag's value from a positional arg.
-var kubectlValueFlags = set(append([]string{
-	"--chunk-size", "--field-selector", "-f", "--filename", "-k", "--kustomize", "-L",
-	"--label-columns", "-o", "--output", "--raw", "-l", "--selector", "--sort-by", "--subresource",
-	"--template",
-}, kubectlGlobalValueFlags...)...)
-
-// The get flags that the target subcommand also accepts with the same meaning. Everything else
-// on "get" is about formatting its table (-o, -w, --show-labels, ...) and is dropped.
-var (
-	logsSharedFlags     = set("-l", "--selector")
-	describeSharedFlags = set(
-		"-A", "--all-namespaces", "--chunk-size", "-f", "--filename", "-k", "--kustomize",
-		"-l", "--selector", "-R", "--recursive",
-	)
-)
+// The option keys offered per mode. A flag with a value is "on" only with exactly that value.
+var kubectlOptions = map[string][]optionSpec{
+	"get": {
+		{"w", "--watch", "", []string{"-w"}},
+		{"o", "--output", "wide", []string{"-o", "wide"}},
+		{"y", "--output", "yaml", []string{"-o", "yaml"}},
+		{"a", "--all-namespaces", "", []string{"-A"}},
+		{"l", "--show-labels", "", []string{"--show-labels"}},
+	},
+	"logs": {
+		{"f", "--follow", "", []string{"-f"}},
+		{"p", "--previous", "", []string{"-p"}},
+		{"t", "--timestamps", "", []string{"--timestamps"}},
+		{"c", "--all-containers", "", []string{"--all-containers"}},
+		{"x", "--prefix", "", []string{"--prefix"}},
+		{"n", "--tail", "100", []string{"--tail=100"}},
+		{"s", "--since", "1h", []string{"--since=1h"}},
+	},
+	"describe": {
+		{"e", "--show-events", "false", []string{"--show-events=false"}},
+	},
+}
 
 var podTypes = set("pods", "pod", "po")
 
-type kflag struct {
-	name  string
+type flagTable struct {
+	short map[string]string // "-f" -> "--follow"
+	value map[string]bool   // long name -> takes a value
+}
+
+func parseFlagTable(spec string) flagTable {
+	t := flagTable{short: map[string]string{}, value: map[string]bool{}}
+	for _, entry := range strings.FieldsFunc(spec, func(r rune) bool { return r == ';' || r == '\n' }) {
+		f := strings.Fields(entry)
+		if len(f) != 3 {
+			continue
+		}
+		if f[0] != "-" {
+			t.short[f[0]] = f[1]
+		}
+		t.value[f[1]] = f[2] == "value"
+	}
+	return t
+}
+
+type optionSpec struct {
+	key   string
+	long  string
+	value string // "" for a boolean flag
 	words []string
 }
 
+// A parsed flag, spanning cmd[start:end].
+type kflag struct {
+	long       string
+	start, end int
+}
+
 type kubectlCmd struct {
-	argv0 string
+	words []string
 	sub   string
 	flags []kflag
 	pos   []string // positional args after the subcommand
+	end   int      // where new flags go: before "--", else the end
+}
+
+// lookup resolves a flag word to its long name using the subcommand's table, then the global one,
+// so "-f" reads as --filename on get but --follow on logs.
+func lookup(sub, name string) (long string, takesValue, known bool) {
+	for _, t := range []flagTable{kubectlFlagTables[sub], kubectlFlagTables[""]} {
+		if l, ok := t.short[name]; ok {
+			name = l
+		}
+		if v, ok := t.value[name]; ok {
+			return name, v, true
+		}
+	}
+	return name, false, false
 }
 
 func parseKubectl(cmd []string) (kubectlCmd, bool) {
 	if len(cmd) == 0 || !kubectlNames[bare(cmd[0])] {
 		return kubectlCmd{}, false
 	}
-	k := kubectlCmd{argv0: cmd[0]}
-	var pos []string
+	k := kubectlCmd{words: cmd, end: len(cmd)}
 	for i := 1; i < len(cmd); i++ {
 		w := cmd[i]
 		switch {
 		case w == "--":
-			pos = append(pos, cmd[i+1:]...)
+			k.end = i
+			k.pos = append(k.pos, cmd[i+1:]...)
 			i = len(cmd)
-		case strings.HasPrefix(w, "--"):
-			name, _, hasValue := strings.Cut(w, "=")
-			f := kflag{name: name, words: []string{w}}
-			if !hasValue && kubectlValueFlags[name] && i+1 < len(cmd) {
-				i++
-				f.words = append(f.words, cmd[i])
-			}
-			k.flags = append(k.flags, f)
 		case strings.HasPrefix(w, "-") && len(w) > 1:
-			// Short flags may carry their value attached: -nfoo or -n=foo.
-			name := w[:2]
-			f := kflag{name: name, words: []string{w}}
-			if len(w) == 2 && kubectlValueFlags[name] && i+1 < len(cmd) {
+			// Values may be attached: --ns=x, -nx, -n=x.
+			name, attached := w[:2], len(w) > 2
+			if strings.HasPrefix(w, "--") {
+				name, _, attached = strings.Cut(w, "=")
+			}
+			long, takesValue, _ := lookup(k.sub, name)
+			f := kflag{long: long, start: i, end: i + 1}
+			if takesValue && !attached && i+1 < len(cmd) {
 				i++
-				f.words = append(f.words, cmd[i])
+				f.end = i + 1
 			}
 			k.flags = append(k.flags, f)
+		case k.sub == "":
+			k.sub = bare(w)
 		default:
-			pos = append(pos, w)
+			k.pos = append(k.pos, w)
 		}
 	}
-	if len(pos) == 0 {
-		return kubectlCmd{}, false
-	}
-	k.sub, k.pos = bare(pos[0]), pos[1:]
-	return k, true
+	return k, k.sub != ""
 }
 
-func (k kubectlCmd) has(names ...string) bool {
+func (k kubectlCmd) find(longs ...string) (kflag, bool) {
 	for _, f := range k.flags {
-		for _, n := range names {
-			if f.name == n {
-				return true
+		for _, l := range longs {
+			if f.long == l {
+				return f, true
 			}
 		}
 	}
-	return false
+	return kflag{}, false
 }
 
-// rebuild emits "argv0 sub <global flags> <flags named in keep> args...".
-func (k kubectlCmd) rebuild(sub string, keep map[string]bool, args ...string) []string {
-	out := []string{k.argv0, sub}
+func (k kubectlCmd) has(longs ...string) bool {
+	_, ok := k.find(longs...)
+	return ok
+}
+
+func (k kubectlCmd) value(f kflag) string {
+	if f.end-f.start == 2 {
+		return k.words[f.start+1]
+	}
+	w := k.words[f.start]
+	if strings.HasPrefix(w, "--") {
+		_, v, _ := strings.Cut(w, "=")
+		return v
+	}
+	return strings.TrimPrefix(w[2:], "=")
+}
+
+// rebuild turns the command into "argv0 sub <flags> args...", keeping each flag the target
+// subcommand also has. A short form that means something else there is spelled out in full.
+func (k kubectlCmd) rebuild(sub string, args ...string) []string {
+	out := []string{k.words[0], sub}
 	for _, f := range k.flags {
-		if kubectlGlobalFlags[f.name] || keep[f.name] {
-			out = append(out, f.words...)
+		if _, takesValue, ok := lookup(sub, f.long); ok {
+			w := k.words[f.start]
+			if short := w[:2]; !strings.HasPrefix(w, "--") {
+				if l, _, _ := lookup(sub, short); l != f.long {
+					w = f.long
+					if takesValue {
+						w += "=" + k.value(f)
+					}
+					out = append(out, w)
+					continue
+				}
+			}
+			out = append(out, k.words[f.start:f.end]...)
 		}
 	}
 	return append(out, args...)
 }
 
-func kubectlActions(cmd []string) []action {
-	k, ok := parseKubectl(cmd)
-	if !ok || k.sub != "get" || (len(k.pos) == 0 && !k.has("-f", "--filename", "-k", "--kustomize")) {
-		return nil
-	}
-	var acts []action
-
-	if logArgs, ok := podLogTarget(k); ok {
-		acts = append(acts, action{"H", "logs", func([]string) []string {
-			return k.rebuild("logs", logsSharedFlags, logArgs...)
-		}})
-	}
-	acts = append(acts, action{"D", "describe", func([]string) []string {
-		return k.rebuild("describe", describeSharedFlags, k.pos...)
-	}})
-	return acts
+func (k kubectlCmd) splice(start, end int, with []string) []string {
+	out := append([]string{}, k.words[:start]...)
+	out = append(out, with...)
+	return append(out, k.words[end:]...)
 }
 
-// podLogTarget returns the logs arguments for a "get" that names exactly one pod, or for pods
-// picked by a label selector. "kubectl logs" has no --all-namespaces and no -f/-k (on logs, -f
-// is --follow), so those rule it out.
+func kubectlMode(cmd []string) (mode, bool) {
+	k, ok := parseKubectl(cmd)
+	if !ok {
+		return mode{}, false
+	}
+	m := mode{name: bare(k.words[0]) + " " + k.sub}
+	switch k.sub {
+	case "get", "describe":
+		if logArgs, ok := podLogTarget(k); ok {
+			m.actions = append(m.actions, action{"H", "logs", func() []string {
+				return k.rebuild("logs", logArgs...)
+			}})
+		}
+		if len(k.pos) > 0 || k.has("--filename", "--kustomize") {
+			other := map[string]string{"get": "describe", "describe": "get"}[k.sub]
+			m.actions = append(m.actions, action{strings.ToUpper(other[:1]), other, func() []string {
+				return k.rebuild(other, k.pos...)
+			}})
+		}
+	case "logs":
+		if args, ok := logsResource(k); ok {
+			for _, sub := range []string{"get", "describe"} {
+				m.actions = append(m.actions, action{strings.ToUpper(sub[:1]), sub, func() []string {
+					return k.rebuild(sub, args...)
+				}})
+			}
+		}
+	default:
+		return mode{}, false
+	}
+	for _, o := range kubectlOptions[k.sub] {
+		m.options = append(m.options, k.option(o))
+	}
+	return m, true
+}
+
+// option toggles a flag: on removes it, a different value is replaced, absent is added.
+func (k kubectlCmd) option(o optionSpec) option {
+	f, present := k.find(o.long)
+	on := present && (o.value == "" && k.value(f) != "false" || o.value != "" && k.value(f) == o.value)
+	return option{o.key, strings.Join(o.words, " "), on, func() []string {
+		switch {
+		case on:
+			return k.splice(f.start, f.end, nil)
+		case present:
+			return k.splice(f.start, f.end, o.words)
+		default:
+			return k.splice(k.end, k.end, o.words)
+		}
+	}}
+}
+
+// podLogTarget returns the logs arguments for a get/describe that names exactly one pod, or for
+// pods picked by a label selector. "kubectl logs" cannot read resources from files or across all
+// namespaces, so --filename, --kustomize and --all-namespaces rule it out.
 func podLogTarget(k kubectlCmd) ([]string, bool) {
-	if k.has("-A", "--all-namespaces", "-f", "--filename", "-k", "--kustomize") {
+	if k.has("--all-namespaces", "--filename", "--kustomize") {
 		return nil, false
 	}
 	switch {
 	case len(k.pos) == 2 && podTypes[bare(k.pos[0])]:
 		return []string{k.pos[1]}, true
-	case len(k.pos) == 1 && podTypes[bare(k.pos[0])] && k.has("-l", "--selector"):
+	case len(k.pos) == 1 && podTypes[bare(k.pos[0])] && k.has("--selector"):
 		return nil, true
 	case len(k.pos) == 1:
 		if typ, name, ok := strings.Cut(bare(k.pos[0]), "/"); ok && podTypes[typ] && name != "" {
 			return []string{name}, true
 		}
+	}
+	return nil, false
+}
+
+// logsResource maps "logs NAME", "logs TYPE/NAME" or "logs -l SEL" to get/describe arguments.
+func logsResource(k kubectlCmd) ([]string, bool) {
+	switch {
+	case len(k.pos) > 0 && strings.Contains(k.pos[0], "/"):
+		return k.pos[:1], true
+	case len(k.pos) > 0:
+		return []string{"pod", k.pos[0]}, true
+	case k.has("--selector"):
+		return []string{"pods"}, true
 	}
 	return nil, false
 }

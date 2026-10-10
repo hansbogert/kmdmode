@@ -2,9 +2,22 @@
 
 A zsh modal keymap that rewrites the command line you are typing into a related command.
 
-Type `kubectl get pods -n ns pod1`, press **Alt-m**, and the message line shows the actions for
-that line (`[H] logs  [D] describe  [Esc] cancel`). Press **H** and the line becomes
-`kubectl logs -n ns pod1`, ready to edit or run.
+Type `kubectl get pods -n ns pod1`, press **Alt-m**, and the message line names the mode and its
+keys:
+
+```
+cmdmode [kubectl get]  [H] logs  [D] describe  [-] options  [Esc] exit  [Enter] run
+```
+
+Press **H** and the line becomes `kubectl logs -n ns pod1`; the mode follows the line, so you are
+now in `[kubectl logs]`. Press **-** for that mode's flags, each a key that toggles it (`*` = on):
+
+```
+cmdmode [kubectl logs -]  [f] -f*  [p] -p  [t] --timestamps  [c] --all-containers  ...  [Esc] back
+```
+
+Keys are case-insensitive. **Esc** goes back from the options, then leaves the mode; **Enter**
+runs the line.
 
 ## Install
 
@@ -34,17 +47,24 @@ cmdmode apply H -- kubectl get pods -n ns pod1    # kubectl logs -n ns pod1
 The helper rewrites the last simple command that has an action, so env prefixes
 (`KUBECONFIG=x kubectl ...`), pipes and `&&` chains are left alone.
 
-## Actions
+## Modes
 
-| Line                                   | Key | Result                                          |
-|----------------------------------------|-----|-------------------------------------------------|
-| `kubectl get pod[s]/po NAME`, `pod/NAME` | H | `kubectl logs NAME`                             |
-| `kubectl get pods -l SEL`              | H   | `kubectl logs -l SEL`                           |
-| `kubectl get ...`                      | D   | `kubectl describe ...`                          |
+| Mode               | Actions                                   | Options (after `-`)                                    |
+|--------------------|-------------------------------------------|--------------------------------------------------------|
+| `kubectl get`      | H logs (one pod, or pods `-l`), D describe | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels` |
+| `kubectl logs`     | G get, D describe                         | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
+| `kubectl describe` | H logs (as for get), G get                | e `--show-events=false`                                |
 
-Connection flags (`-n`, `--context`, `--kubeconfig`, ...) carry over; `get`-only flags such as
-`-o` are dropped. Add a rule by returning another `action` from a function like `kubectlActions`
-and listing it in `commandActions`.
+An option toggles: on removes it, a different value (`-o yaml` when pressing o) is replaced,
+absent is added before any `--`.
+
+When an action switches subcommand, global flags (`-n`, `--context`, ...) carry over, and so do
+the flags the target subcommand also has, matched by long name: `get -f` is `--filename`, which
+describe has, while `logs -f` is `--follow`, which get does not. The rest is dropped. H is not
+offered with `-A`, `-f` or `-k`, or for more than one pod, because `kubectl logs` cannot do those.
+The flag tables in `kubectl.go` come from `kubectl <sub> --help` and `kubectl options`.
+
+To add a mode, return it from `commandMode` in `line.go`.
 
 ## Test
 

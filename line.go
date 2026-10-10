@@ -5,41 +5,65 @@ import (
 	"strings"
 )
 
-// An action rewrites one simple command (no env prefix, no operators) into another.
+// A mode is what cmdmode offers for one recognised command, e.g. "kubectl get": actions rewrite
+// it into another command, options toggle one of its flags. Both return the new command words.
+type mode struct {
+	name    string
+	actions []action
+	options []option
+}
+
 type action struct {
 	key   string
 	label string
-	apply func(cmd []string) []string
+	apply func() []string
 }
 
-// actionsFor returns every rule's actions for one simple command.
-func actionsFor(words []string) []action {
-	_, cmd, ok := target(words)
-	if !ok {
-		return nil
-	}
-	return commandActions(cmd)
+type option struct {
+	key    string
+	label  string
+	on     bool
+	toggle func() []string
 }
 
-func commandActions(cmd []string) []action {
-	return kubectlActions(cmd)
+func commandMode(cmd []string) (mode, bool) {
+	return kubectlMode(cmd)
 }
 
-// apply runs the action bound to key (case-insensitively) on the target command and splices the
-// result back into the full line, leaving pipes, other commands and env assignments untouched.
-func apply(key string, words []string) ([]string, bool) {
-	start, cmd, ok := target(words)
+// modeFor returns the mode of the command line's target command.
+func modeFor(words []string) (mode, bool) {
+	_, _, m, ok := target(words)
+	return m, ok
+}
+
+// run applies the action (or, with toggle, the option) bound to key, case-insensitively, and
+// splices the result back into the full line, leaving pipes, other commands and env assignments
+// untouched.
+func run(key string, toggle bool, words []string) ([]string, bool) {
+	start, cmd, m, ok := target(words)
 	if !ok {
 		return nil, false
 	}
-	for _, a := range commandActions(cmd) {
-		if strings.EqualFold(a.key, key) {
-			out := append([]string{}, words[:start]...)
-			out = append(out, a.apply(cmd)...)
-			return append(out, words[start+len(cmd):]...), true
+	var rewrite func() []string
+	if toggle {
+		for _, o := range m.options {
+			if strings.EqualFold(o.key, key) {
+				rewrite = o.toggle
+			}
+		}
+	} else {
+		for _, a := range m.actions {
+			if strings.EqualFold(a.key, key) {
+				rewrite = a.apply
+			}
 		}
 	}
-	return nil, false
+	if rewrite == nil {
+		return nil, false
+	}
+	out := append([]string{}, words[:start]...)
+	out = append(out, rewrite()...)
+	return append(out, words[start+len(cmd):]...), true
 }
 
 var operators = map[string]bool{
@@ -48,9 +72,9 @@ var operators = map[string]bool{
 
 var assignment = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*=`)
 
-// target picks the last simple command on the line that has any action, since that is usually
-// the one being typed. It returns the command's start index and its words.
-func target(words []string) (int, []string, bool) {
+// target picks the last simple command on the line that has a mode, since that is usually the
+// one being typed. It returns the command's start index, its words and its mode.
+func target(words []string) (int, []string, mode, bool) {
 	end := len(words)
 	for i := len(words); i >= 0; i-- {
 		if i > 0 && !operators[words[i-1]] {
@@ -60,10 +84,12 @@ func target(words []string) (int, []string, bool) {
 		for start < end && assignment.MatchString(words[start]) {
 			start++
 		}
-		if cmd := words[start:end]; len(cmd) > 0 && len(commandActions(cmd)) > 0 {
-			return start, cmd, true
+		if cmd := words[start:end]; len(cmd) > 0 {
+			if m, ok := commandMode(cmd); ok {
+				return start, cmd, m, true
+			}
 		}
 		end = i - 1
 	}
-	return 0, nil, false
+	return 0, nil, mode{}, false
 }
