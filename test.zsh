@@ -47,12 +47,34 @@ check 'kubectl get pods p' $'h-f\r' 'ran: kubectl logs p -f'
 kv=$(mktemp)
 print -r -- "stty rows 20 cols 100
 KVIEW_INTERVAL=0.3 $root/kview zsh -c 'print NAME STATUS; print pod Running \$RANDOM'; print exit=\$?" >| $kv
-screen=$( (sleep 2; printf '\e') | timeout 10 script -qfc "zsh -f $kv" /dev/null | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')
+screen=$( (sleep 2; printf '\e'; sleep 1) | timeout 10 script -qfc "zsh -f $kv" /dev/null | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')
 rows=$(print -r -- $screen | grep -oE 'Running [0-9]+' | sort -u | wc -l)
 if [[ $screen == *'NAME STATUS'* && $screen == *exit=0* ]] && (( rows >= 3 )); then
   print "ok   kview: header pinned, $rows refreshes, Esc exits 0"
 else
   print "FAIL kview: rows=$rows, screen: ${(q)screen[1,400]}"; fail=1
 fi
-rm -f $out $kv
+# kview Enter: the picked row's namespace and name land on the next prompt. Fake kubectl and
+# kubecolor print a colored table, so this also checks the colors are stripped from the pick.
+fake=$(mktemp -d)
+print -r -- $'#!/bin/sh\nprintf "NAMESPACE NAME READY\\n\\033[36mkube-system\\033[0m coredns-x 1/1\\n"' >| $fake/kubectl
+cp $fake/kubectl $fake/kubecolor
+chmod +x $fake/kubectl $fake/kubecolor
+: >| $out
+zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
+zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
+zpty -w t "_dump() { [[ -n \$BUFFER ]] && print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey '^T' _dump"
+zpty -w t "kview kubectl get pods -A -o wide"
+sleep 1.5
+zpty -w -n t $'\r'
+sleep 1
+zpty -w -n t $'\x14'
+for i in {1..40}; do [[ -s $out ]] && break; sleep 0.05; done
+zpty -d t
+if [[ $(<$out) == 'kubectl get -n kube-system pods coredns-x ' ]]; then
+  print "ok   kview Enter: next prompt is ${(q)$(<$out)}"
+else
+  print "FAIL kview Enter: next prompt is ${(q)$(<$out)}"; fail=1
+fi
+rm -rf $out $kv $fake
 exit $fail

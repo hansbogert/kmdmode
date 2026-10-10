@@ -7,10 +7,12 @@
 //	                               "mode NAME", "action KEY LABEL", "option KEY LABEL on|off"
 //	cmdmode apply KEY -- WORD...   print the line after action KEY; exit 1 if it does not apply
 //	cmdmode toggle KEY -- WORD...  print the line after toggling option KEY; exit 1 likewise
+//	cmdmode pick -- WORD...        print a command for the row on stdin, picked from WORD's output
 package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strings"
 )
@@ -36,8 +38,15 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println(strings.Join(out, " "))
+	case len(args) >= 2 && args[0] == "pick" && args[1] == "--":
+		row, _ := io.ReadAll(os.Stdin)
+		out, ok := kubectlPick(args[2:], string(row))
+		if !ok {
+			os.Exit(1)
+		}
+		fmt.Println(strings.Join(out, " "))
 	default:
-		fmt.Fprintln(os.Stderr, "usage: cmdmode menu -- WORD... | cmdmode apply|toggle KEY -- WORD...")
+		fmt.Fprintln(os.Stderr, "usage: cmdmode menu|pick -- WORD... | cmdmode apply|toggle KEY -- WORD...")
 		os.Exit(2)
 	}
 }

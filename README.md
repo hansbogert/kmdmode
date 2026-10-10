@@ -64,7 +64,13 @@ dropped, context and `-l` carry over, and an existing `-o`/`-w` is replaced.
 `kview CMD...` (a script, linked onto PATH by `make install`) shows CMD's output in fzf: scroll it, type to filter, the
 first line stays pinned as the header, and CMD re-runs `$KVIEW_INTERVAL` (default 2) seconds after
 each refresh without blanking the list. ctrl-r refreshes now, Esc leaves. Without fzf it falls
-back to `watch`.
+back to `watch`. kubectl output is colored through [kubecolor](https://github.com/kubecolor/kubecolor)
+when it is on PATH (`go install github.com/kubecolor/kubecolor@v0.8.0`).
+
+**Enter** on a row puts a command for that resource on your next prompt, e.g. Enter on
+`kube-system coredns-x ...` gives `kubectl get -n kube-system pods coredns-x`, ready for Alt-m.
+kview writes the line to `$CMDMODE_PICK_FILE` and the plugin's precmd hook loads it with
+`print -z`; without the plugin, kview prints the line instead.
 
 An option toggles: on removes it, a different value (`-o yaml` when pressing o) is replaced,
 absent is added before any `--`.

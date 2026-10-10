@@ -91,6 +91,25 @@ func TestMenu(t *testing.T) {
 	}
 }
 
+func TestPick(t *testing.T) {
+	cases := []struct {
+		cmd, row, want string
+	}{
+		{"kubectl get pods -A -o wide", "kube-system  coredns-x  1/1  Running  0  2d  10.0.0.1",
+			"kubectl get -n kube-system pods coredns-x"},
+		{"kubectl get --context c deploy -A -o wide", "ns d 1/1 1 1 5d",
+			"kubectl get --context c -n ns deploy d"},
+		{"kubectl get -n ns pods -o wide -w", "p 1/1 Running", "kubectl get -n ns pods p"},
+		{"kubectl get all -A", "ns pod/p 1/1 Running", "kubectl get -n ns pod/p"},
+		{"kubectl get pods -A", "", ""},
+		{"ls -l", "x", ""},
+	}
+	for _, c := range cases {
+		out, ok := kubectlPick(strings.Fields(c.cmd), c.row)
+		check(t, "pick", c.cmd, c.want, out, ok)
+	}
+}
+
 func check(t *testing.T, key, in, want string, out []string, ok bool) {
 	t.Helper()
 	got := strings.Join(out, " ")

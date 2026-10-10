@@ -269,6 +269,35 @@ func (k kubectlCmd) overview() []string {
 	return append(append([]string{"kview"}, k.rebuild("get", typ)...), "-A", "-o", "wide")
 }
 
+// kubectlPick turns a row picked from "kubectl get TYPE ..." output into a get of that one
+// resource: NAMESPACE and NAME come from the row's leading columns (NAMESPACE only with -A),
+// replacing -A with -n NS and dropping output and watch flags.
+func kubectlPick(cmd []string, row string) ([]string, bool) {
+	k, ok := parseKubectl(cmd)
+	fields := strings.Fields(row)
+	if !ok || k.sub != "get" || len(fields) == 0 {
+		return nil, false
+	}
+	k = k.without("--output", "--watch", "--watch-only")
+	var ns []string
+	if k.has("--all-namespaces") {
+		if len(fields) < 2 {
+			return nil, false
+		}
+		ns, fields = []string{"-n", fields[0]}, fields[1:]
+		k = k.without("--all-namespaces", "--namespace")
+	}
+	res := []string{fields[0]} // TYPE/NAME, as "get all" lists them
+	if !strings.Contains(fields[0], "/") {
+		typ := "pods"
+		if len(k.pos) > 0 {
+			typ, _, _ = strings.Cut(k.pos[0], "/")
+		}
+		res = []string{typ, fields[0]}
+	}
+	return append(append(k.rebuild("get"), ns...), res...), true
+}
+
 // option toggles a flag: on removes it, a different value is replaced, absent is added.
 func (k kubectlCmd) option(o optionSpec) option {
 	f, present := k.find(o.long)
