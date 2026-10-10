@@ -20,15 +20,17 @@ _cmdmode_leave() {
   zle -M ''
 }
 
-# Shows the current mode's keys, prefixed by an optional note in $1; leaves the mode when the
-# line no longer has one.
+# Shows the current mode's keys, prefixed by an optional note in $1. Kept to one terminal line:
+# a message wider than the terminal wraps behind zle's back, which throws its later redraws off by
+# a row (garbling the prompt) and scrolls the screen. Leaves when the line has no mode, saying so
+# unless $2 is "quiet" (after an action like W, whose kview line has no mode by design).
 _cmdmode_render() {
   local -a words lines f
   _cmdmode_words
   lines=(${(f)"$("$_cmdmode_bin" menu -- "${words[@]}")"})
   if (( ! $#lines )); then
     _cmdmode_leave
-    zle -M "cmdmode: no actions for this line"
+    [[ $2 == quiet ]] || zle -M "cmdmode: no actions for this line"
     return 1
   fi
   local name msg line
@@ -41,10 +43,12 @@ _cmdmode_render() {
     esac
   done
   if [[ -n $_cmdmode_options ]]; then
-    zle -M "${1}cmdmode [$name -]${msg}  [Esc] back"
+    msg="${1}cmdmode [$name -]${msg}  [Esc] back"
   else
-    zle -M "${1}cmdmode [$name]${msg}  [-] options  [Esc] exit  [Enter] run"
+    msg="${1}cmdmode [$name]${msg}  [-] options  [Esc] exit  [Enter] run"
   fi
+  (( $#msg < COLUMNS )) || msg="${msg[1,COLUMNS-2]}…"
+  zle -M "$msg"
 }
 
 _cmdmode_enter() {
@@ -68,7 +72,7 @@ _cmdmode_dispatch() {
     [[ $BUFFER == *[[:space:]] ]] && out+=' '
     BUFFER=$out
     CURSOR=$#BUFFER
-    _cmdmode_render
+    _cmdmode_render "" quiet
   else
     _cmdmode_render "no '$KEYS' here; "
   fi
