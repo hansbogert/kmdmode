@@ -54,6 +54,12 @@ The helper rewrites the last simple command that has an action, so env prefixes
 | `kubectl get`      | H logs (one pod, or pods `-l`), D describe | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels` |
 | `kubectl logs`     | G get, D describe                         | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
 | `kubectl describe` | H logs (as for get), G get                | e `--show-events=false`                                |
+| any other `kubectl ...` | O overview                           |                                                        |
+
+**O overview** is in every kubectl mode: the k9s-style live list of the line's resource type,
+`kubectl get <type> -o wide -w`. The type is the one `get`/`describe`/`delete`/... names, else
+pods (for `logs`, `exec`, bare `kubectl -n ns`); names are dropped, namespace, context, `-l` and
+`-A` carry over, and an existing `-o`/`-w` is replaced.
 
 An option toggles: on removes it, a different value (`-o yaml` when pressing o) is replaced,
 absent is added before any `--`.

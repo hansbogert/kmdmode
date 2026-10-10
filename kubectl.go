@@ -1,6 +1,9 @@
 package main
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 var kubectlNames = set("kubectl", "k", "kubecolor")
 
@@ -148,7 +151,7 @@ func parseKubectl(cmd []string) (kubectlCmd, bool) {
 			k.pos = append(k.pos, w)
 		}
 	}
-	return k, k.sub != ""
+	return k, true
 }
 
 func (k kubectlCmd) find(longs ...string) (kflag, bool) {
@@ -202,6 +205,13 @@ func (k kubectlCmd) rebuild(sub string, args ...string) []string {
 	return append(out, args...)
 }
 
+// without returns the command minus the flags with these long names.
+func (k kubectlCmd) without(longs ...string) kubectlCmd {
+	drop := set(longs...)
+	k.flags = slices.DeleteFunc(slices.Clone(k.flags), func(f kflag) bool { return drop[f.long] })
+	return k
+}
+
 func (k kubectlCmd) splice(start, end int, with []string) []string {
 	out := append([]string{}, k.words[:start]...)
 	out = append(out, with...)
@@ -213,7 +223,7 @@ func kubectlMode(cmd []string) (mode, bool) {
 	if !ok {
 		return mode{}, false
 	}
-	m := mode{name: bare(k.words[0]) + " " + k.sub}
+	m := mode{name: strings.TrimSpace(bare(k.words[0]) + " " + k.sub)}
 	switch k.sub {
 	case "get", "describe":
 		if logArgs, ok := podLogTarget(k); ok {
@@ -235,13 +245,26 @@ func kubectlMode(cmd []string) (mode, bool) {
 				}})
 			}
 		}
-	default:
-		return mode{}, false
 	}
+	m.actions = append(m.actions, action{"O", "overview", k.overview})
 	for _, o := range kubectlOptions[k.sub] {
 		m.options = append(m.options, k.option(o))
 	}
 	return m, true
+}
+
+// Subcommands whose first argument is a resource type (or TYPE/NAME).
+var typedSubs = set("get", "describe", "delete", "edit", "label", "annotate", "patch", "scale")
+
+// overview is the k9s-style list: every resource of the line's type in its namespace (or across
+// all with -A), wide and watching. Names are dropped; selectors and global flags carry over.
+func (k kubectlCmd) overview() []string {
+	typ := "pods"
+	if typedSubs[k.sub] && len(k.pos) > 0 {
+		typ, _, _ = strings.Cut(k.pos[0], "/")
+	}
+	k = k.without("--output", "--watch", "--watch-only", "--filename", "--kustomize", "--recursive", "--raw")
+	return append(k.rebuild("get", typ), "-o", "wide", "-w")
 }
 
 // option toggles a flag: on removes it, a different value is replaced, absent is added.
