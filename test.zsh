@@ -90,5 +90,29 @@ check_pick() {  # check_pick KEYS WANT
 }
 check_pick '' 'kubectl get -n kube-system pods coredns-x '
 check_pick $'\x1a' 'kubectl get -n kube-system pods bad-y '
+# kview keeps the cursor on its row across refreshes, though READY flips each time, and Enter on
+# a describe document leaves without putting anything on the prompt.
+cat >| $fake/kubectl <<'SH'
+#!/bin/sh
+if [ "$1" = describe ]; then
+  echo "Name: p"; i=1; while [ $i -le 40 ]; do echo "Field-$i: value"; i=$((i+1)); done; exit
+fi
+r=$(( $(date +%s) % 2 ))
+echo "NAME READY STATUS"; i=1; while [ $i -le 40 ]; do echo "row-$i $r/1 Running"; i=$((i+1)); done
+SH
+rm -f $fake/kubecolor
+for c want in 'get pods' 'kubectl get pods row-6' 'describe pod p' ''; do
+  print -r -- "stty rows 12 cols 80; export PATH=$fake:\$PATH; unset CMDMODE_PICK_FILE
+KVIEW_INTERVAL=0.3 $root/kview kubectl $c; print exit=\$?" >| $kv
+  screen=$( (sleep 1; printf '\016\016\016\016\016'; sleep 2.5; printf '\r'; sleep 1.5) |
+    timeout 12 script -qfc "zsh -f $kv" /dev/null)
+  got=$(print -r -- $screen | grep -ao 'kubectl get pods row-[0-9]*')
+  if [[ $got == "$want" && $screen == *exit=0* ]]; then
+    print "ok   kview $c: 5 down, refreshes, Enter gives ${(q)got}"
+  else
+    print "FAIL kview $c: Enter gave ${(q)got}, want ${(q)want}"; fail=1
+    print -r -- $screen | sed "s/\x1b\[[0-9;?]*[a-zA-Z]//g" | tr "\r" "\n" | grep -av "^\s*$" | tail -4 | cut -c1-100
+  fi
+done
 rm -rf $out $kv $fake
 exit $fail

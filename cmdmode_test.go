@@ -53,6 +53,10 @@ func TestApply(t *testing.T) {
 		{"G", "kubectl delete pod p --grace-period 0 -n ns", "kubectl get -n ns pod p"},
 		{"I", "kubectl delete pod p", "kubectl describe pod p"},
 		{"H", "kubectl delete pod p -n ns", "kubectl logs -n ns p"},
+		// watch: the line itself in kview, which refreshes, so -w goes.
+		{"W", "kubectl describe pod p -n ns", "kview kubectl describe pod p -n ns"},
+		{"w", "kubectl get pods -n ns -w -o wide", "kview kubectl get pods -n ns -o wide"},
+		{"W", "kubectl logs -f p", ""},
 		// overview: the type's full list across namespaces, wide, in kview, from any kubectl line.
 		{"O", "kubectl logs -n ns -f p --tail 5", "kview kubectl get pods -A -o wide"},
 		{"o", "kubectl get deploy/d -o yaml --context c", "kview kubectl get --context c deploy -A -o wide"},

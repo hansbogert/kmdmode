@@ -1,13 +1,20 @@
 #!/usr/bin/env zsh
 # kview CMD...: a k9s-style live view of CMD's output. Scroll and filter it in fzf with the first
 # line pinned as the header; CMD re-runs $KVIEW_INTERVAL (2) seconds after each refresh, and
-# reload-sync keeps the old list on screen until the new one is complete. ctrl-r refreshes now,
-# ctrl-z shows only faulty rows (cmdmode faults),
-# Enter puts a command for the picked row (e.g. "kubectl get -n NS pods NAME") on the next prompt.
-# kubectl output is colored through kubecolor when it is installed.
+# reload-sync keeps the old view on screen until the new one is complete. ctrl-r refreshes now.
+#
+# "kubectl get" output is a table: the cursor follows its row across refreshes, ctrl-z shows only
+# faulty rows (cmdmode faults), and Enter puts a command for the picked row (e.g. "kubectl get
+# -n NS pods NAME") on the next prompt. Anything else, like "kubectl describe", is a document:
+# long lines wrap, the cursor stays on its line, and Enter just leaves.
+#
+# kubectl output is colored through kubecolor when it is installed. Uses the fzf that make
+# installs into bin/ (needs fzf 0.59+ for --id-nth, --wrap and trigger), else falls back to watch.
 # An executable rather than a plugin function, so shells loaded before an update and history
 # replayed outside an interactive shell find it too.
 emulate -L zsh
+here=${0:A:h}
+fzf=$here/bin/fzf
 view=("$@")
 if [[ $1 == kubectl ]] && (( $+commands[kubecolor] )); then
   view[1]=kubecolor
@@ -15,25 +22,49 @@ if [[ $1 == kubectl ]] && (( $+commands[kubecolor] )); then
 fi
 cmd="${(j: :)${(@q-)view}} 2>&1"
 interval=${KVIEW_INTERVAL:-2}
-if (( ! $+commands[fzf] )); then
+if [[ ! -x $fzf ]]; then
+  print -u2 "kview: $fzf missing (run make in ${here}); falling back to watch"
   exec watch -n $interval -- $cmd
 fi
-# ctrl-z (as in k9s) toggles a filter down to faulty rows; the state is whether $faults exists.
-bin=${0:A:h}/bin/cmdmode
-faults=$(mktemp -u)
-trap 'rm -f $faults' EXIT
-src="$cmd | { if [ -e $faults ]; then $bin faults; else cat; fi; }"
-row=$(FZF_DEFAULT_COMMAND=$src fzf --ansi --header-lines=1 --layout=reverse --no-sort --info=inline \
-  --prompt="$* > " --header="enter: pick  ctrl-z: faults only  ctrl-r: refresh  esc: quit" \
-  --bind "load:reload-sync(sleep $interval; $src)" \
-  --bind "ctrl-r:reload-sync($src)" \
-  --bind "ctrl-z:execute-silent([ -e $faults ] && rm -f $faults || touch $faults)+reload-sync($src)")
+
+run=$(mktemp -d ${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/kview.XXXXXX)
+trap 'kill $ticker 2>/dev/null; rm -rf $run' EXIT
+opts=(--ansi --track --header-lines=1 --layout=reverse --no-sort --info=inline --prompt="$* > ")
+if [[ $1 == kubectl && ${@[(I)get]} -gt 0 ]]; then
+  # ctrl-z (as in k9s) toggles a filter down to faulty rows; the state is whether $faults exists.
+  faults=$run/faults
+  src="$cmd | { if [ -e $faults ]; then $here/bin/cmdmode faults; else cat; fi; }"
+  # A row is NAMESPACE NAME with -A, else NAME: READY and STATUS change, so they can't identify it.
+  [[ -n ${@[(r)-A]}${@[(r)--all-namespaces]} ]] && opts+=(--id-nth=1,2) || opts+=(--id-nth=1)
+  opts+=(--header="enter: pick  ctrl-z: faults only  ctrl-r: refresh  esc: quit"
+    --bind "ctrl-z:execute-silent([ -e $faults ] && rm -f $faults || touch $faults; touch $run/now)")
+else
+  src=$cmd
+  opts+=(--wrap --header="ctrl-r: refresh  esc/enter: quit" --bind "enter:abort")
+fi
+# Refresh outside fzf: while a reload is running fzf drops cursor keys and holds Enter, so it
+# must never wait on kubectl. This ticker runs the command into $run/out, then presses f12 over
+# fzf's private socket, which reloads from that file in milliseconds. It fetches at once, then
+# $interval seconds after each fetch, or sooner when ctrl-r or ctrl-z touch $run/now.
+{
+  while :; do
+    eval $src >| $run/next && mv $run/next $run/out
+    curl -s --unix-socket $run/fzf.sock -d 'trigger(f12)' http://localhost >/dev/null
+    for (( t = 0; t < interval * 10; t++ )); do [[ -e $run/now ]] && break; sleep 0.1; done
+    rm -f $run/now
+  done
+} &!
+ticker=$!
+# fzf only ever reads $run/out, starting with the ticker's first fetch.
+row=$(FZF_DEFAULT_COMMAND="while [ ! -e $run/out ]; do sleep 0.1; done; cat $run/out" $fzf $opts --listen=$run/fzf.sock \
+  --bind "f12:reload-sync(cat $run/out)" \
+  --bind "ctrl-r:execute-silent(touch $run/now)")
 rc=$?
 (( rc == 130 )) && exit 0  # Esc is the normal way out, not a failure
 (( rc )) && exit $rc
-# Enter: turn the row into a command for it. The plugin's precmd hook puts what lands in
-# $CMDMODE_PICK_FILE on the next prompt; without the plugin, print it instead.
-line=$($bin pick -- ${(q-)@} <<<$row) || line=$row
+# Enter on a table row: turn the row into a command for it. The plugin's precmd hook puts what
+# lands in $CMDMODE_PICK_FILE on the next prompt; without the plugin, print it instead.
+line=$($here/bin/cmdmode pick -- ${(q-)@} <<<$row) || line=$row
 if [[ -n $CMDMODE_PICK_FILE ]]; then
   print -r -- $line >| $CMDMODE_PICK_FILE
 else

@@ -51,9 +51,9 @@ The helper rewrites the last simple command that has an action, so env prefixes
 
 | Mode               | Actions                                       | Options (after `-`)                                    |
 |--------------------|-----------------------------------------------|--------------------------------------------------------|
-| `kubectl get`      | H logs, I describe, D delete, O overview      | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels` |
+| `kubectl get`      | H logs, I describe, D delete, W watch, O overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels` |
 | `kubectl logs`     | G get, I describe, D delete, O overview       | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
-| `kubectl describe` | H logs, G get, D delete, O overview           | e `--show-events=false`                                |
+| `kubectl describe` | H logs, G get, D delete, W watch, O overview  | e `--show-events=false`                                |
 | `kubectl delete`   | H logs, G get, I describe, O overview         |                                                        |
 | any other `kubectl ...` | O overview                               |                                                        |
 
@@ -69,11 +69,22 @@ all namespaces, `kview kubectl get <type> -A -o wide`. The type is the one `get`
 `delete`/... names, else pods (for `logs`, `exec`, bare `kubectl -n ns`); names and `-n` are
 dropped, context and `-l` carry over, and an existing `-o`/`-w` is replaced.
 
-`kview CMD...` (a script, linked onto PATH by `make install`) shows CMD's output in fzf: scroll it, type to filter, the
-first line stays pinned as the header, and CMD re-runs `$KVIEW_INTERVAL` (default 2) seconds after
-each refresh without blanking the list. ctrl-r refreshes now, Esc leaves. Without fzf it falls
-back to `watch`. kubectl output is colored through [kubecolor](https://github.com/kubecolor/kubecolor)
-when it is on PATH (`go install github.com/kubecolor/kubecolor@v0.8.0`).
+`kview CMD...` (a script, linked onto PATH by `make install`) shows CMD's output in fzf: scroll
+it, type to filter, the first line stays pinned as the header, and CMD re-runs `$KVIEW_INTERVAL`
+(default 2) seconds after each fetch. ctrl-r refreshes now, Esc leaves. kubectl output is colored
+through [kubecolor](https://github.com/kubecolor/kubecolor) when it is on PATH
+(`go install github.com/kubecolor/kubecolor@v0.8.0`).
+
+It has two layouts. `kubectl get` output is a **table**: the cursor follows its row across
+refreshes (by NAMESPACE and NAME, since READY and STATUS change), ctrl-z filters to faults, and
+Enter picks the row (below). Anything else, like `kubectl describe`, is a **document**: long lines
+wrap, and Enter just leaves. **W** (watch) in a get or describe mode wraps the line in kview.
+
+kview fetches outside fzf: a background loop runs CMD into a file and then tells fzf, over a
+private socket, to reload from that file. While a reload runs, fzf drops cursor keys and holds
+Enter, so it must never wait on kubectl. This needs a newer fzf than distros ship (0.59+), so
+`make` installs fzf v0.74.4 into `bin/` for kview alone; your fzf on PATH is untouched. Without
+it, kview falls back to `watch`.
 
 **ctrl-z** (as in k9s) toggles to faulty rows only, marked `[faults only]` in the header: a STATUS
 other than Running/Completed/Succeeded, or a READY count short of its total (which also catches

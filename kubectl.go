@@ -211,6 +211,20 @@ func (k kubectlCmd) rebuild(sub string, args ...string) []string {
 	return append(out, args...)
 }
 
+// dropFlags returns the command's words minus the flags with these long names, in place.
+func (k kubectlCmd) dropFlags(longs ...string) []string {
+	drop := set(longs...)
+	var out []string
+	next := 0
+	for _, f := range k.flags {
+		if drop[f.long] {
+			out = append(out, k.words[next:f.start]...)
+			next = f.end
+		}
+	}
+	return append(out, k.words[next:]...)
+}
+
 // without returns the command minus the flags with these long names.
 func (k kubectlCmd) without(longs ...string) kubectlCmd {
 	drop := set(longs...)
@@ -259,6 +273,11 @@ func kubectlMode(cmd []string) (mode, bool) {
 				}})
 			}
 		}
+	}
+	if k.sub == "get" || k.sub == "describe" {
+		m.actions = append(m.actions, action{"W", "watch", func() []string {
+			return append([]string{"kview"}, k.dropFlags("--watch", "--watch-only")...)
+		}})
 	}
 	m.actions = append(m.actions, action{"O", "overview", k.overview})
 	for _, o := range kubectlOptions[k.sub] {
