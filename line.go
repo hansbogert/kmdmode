@@ -1,6 +1,9 @@
 package main
 
-import "regexp"
+import (
+	"regexp"
+	"strings"
+)
 
 // An action rewrites one simple command (no env prefix, no operators) into another.
 type action struct {
@@ -22,15 +25,15 @@ func commandActions(cmd []string) []action {
 	return kubectlActions(cmd)
 }
 
-// apply runs the action bound to key on the target command and splices the result back into the
-// full line, leaving pipes, other commands and env assignments untouched.
+// apply runs the action bound to key (case-insensitively) on the target command and splices the
+// result back into the full line, leaving pipes, other commands and env assignments untouched.
 func apply(key string, words []string) ([]string, bool) {
 	start, cmd, ok := target(words)
 	if !ok {
 		return nil, false
 	}
 	for _, a := range commandActions(cmd) {
-		if a.key == key {
+		if strings.EqualFold(a.key, key) {
 			out := append([]string{}, words[:start]...)
 			out = append(out, a.apply(cmd)...)
 			return append(out, words[start+len(cmd):]...), true

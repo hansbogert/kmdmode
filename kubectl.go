@@ -4,21 +4,36 @@ import "strings"
 
 var kubectlNames = set("kubectl", "k", "kubecolor")
 
-// Flags that take a separate value word; needed to tell a flag's value from a positional arg.
-var kubectlValueFlags = set(
-	"-n", "--namespace", "--context", "--kubeconfig", "--cluster", "--user", "-s", "--server",
-	"--token", "--as", "--as-group", "--as-uid", "--request-timeout", "--certificate-authority",
-	"--client-certificate", "--client-key", "--tls-server-name", "--cache-dir", "-v", "--v",
-	"-o", "--output", "-l", "--selector", "--field-selector", "--sort-by", "--template",
-	"-L", "--label-columns", "--chunk-size", "--output-watch-events", "--subresource",
-)
+// Global flags (kubectl options) say which cluster to talk to and as whom, so every subcommand
+// accepts them and they carry over. Lists taken from kubectl v1.37.1.
+var kubectlGlobalValueFlags = []string{
+	"--as", "--as-group", "--as-uid", "--as-user-extra", "--cache-dir", "--certificate-authority",
+	"--client-certificate", "--client-key", "--cluster", "--context", "--kubeconfig", "--kuberc",
+	"--log-flush-frequency", "-n", "--namespace", "--password", "--profile", "--profile-output",
+	"--proxy-url", "--request-timeout", "-s", "--server", "--tls-server-name", "--token", "--user",
+	"--username", "-v", "--v", "--vmodule",
+}
 
-// Connection and scope flags mean the same for every subcommand, so they carry over.
-var kubectlGlobalFlags = set(
-	"-n", "--namespace", "--context", "--kubeconfig", "--cluster", "--user", "-s", "--server",
-	"--token", "--as", "--as-group", "--as-uid", "--request-timeout", "--certificate-authority",
-	"--client-certificate", "--client-key", "--tls-server-name", "--cache-dir", "-v", "--v",
-	"--insecure-skip-tls-verify",
+var kubectlGlobalFlags = set(append([]string{
+	"--disable-compression", "--insecure-skip-tls-verify", "--match-server-version",
+	"--warnings-as-errors",
+}, kubectlGlobalValueFlags...)...)
+
+// Flags that take a separate value word; needed to tell a flag's value from a positional arg.
+var kubectlValueFlags = set(append([]string{
+	"--chunk-size", "--field-selector", "-f", "--filename", "-k", "--kustomize", "-L",
+	"--label-columns", "-o", "--output", "--raw", "-l", "--selector", "--sort-by", "--subresource",
+	"--template",
+}, kubectlGlobalValueFlags...)...)
+
+// The get flags that the target subcommand also accepts with the same meaning. Everything else
+// on "get" is about formatting its table (-o, -w, --show-labels, ...) and is dropped.
+var (
+	logsSharedFlags     = set("-l", "--selector")
+	describeSharedFlags = set(
+		"-A", "--all-namespaces", "--chunk-size", "-f", "--filename", "-k", "--kustomize",
+		"-l", "--selector", "-R", "--recursive",
+	)
 )
 
 var podTypes = set("pods", "pod", "po")
@@ -97,30 +112,29 @@ func (k kubectlCmd) rebuild(sub string, keep map[string]bool, args ...string) []
 	return append(out, args...)
 }
 
-var selectorFlags = set("-l", "--selector")
-
 func kubectlActions(cmd []string) []action {
 	k, ok := parseKubectl(cmd)
-	if !ok || k.sub != "get" || len(k.pos) == 0 {
+	if !ok || k.sub != "get" || (len(k.pos) == 0 && !k.has("-f", "--filename", "-k", "--kustomize")) {
 		return nil
 	}
 	var acts []action
 
 	if logArgs, ok := podLogTarget(k); ok {
 		acts = append(acts, action{"H", "logs", func([]string) []string {
-			return k.rebuild("logs", selectorFlags, logArgs...)
+			return k.rebuild("logs", logsSharedFlags, logArgs...)
 		}})
 	}
 	acts = append(acts, action{"D", "describe", func([]string) []string {
-		return k.rebuild("describe", set("-l", "--selector", "-A", "--all-namespaces"), k.pos...)
+		return k.rebuild("describe", describeSharedFlags, k.pos...)
 	}})
 	return acts
 }
 
 // podLogTarget returns the logs arguments for a "get" that names exactly one pod, or for pods
-// picked by a label selector. "kubectl logs" has no --all-namespaces, so -A rules it out.
+// picked by a label selector. "kubectl logs" has no --all-namespaces and no -f/-k (on logs, -f
+// is --follow), so those rule it out.
 func podLogTarget(k kubectlCmd) ([]string, bool) {
-	if k.has("-A", "--all-namespaces") {
+	if k.has("-A", "--all-namespaces", "-f", "--filename", "-k", "--kustomize") {
 		return nil, false
 	}
 	switch {

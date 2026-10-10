@@ -25,6 +25,13 @@ func TestApply(t *testing.T) {
 		{"D", "kubectl get deploy d -n ns -o yaml", "kubectl describe -n ns deploy d"},
 		{"D", "kubectl get pods -A -l app=api", "kubectl describe -A -l app=api pods"},
 		{"X", "kubectl get pods p", ""},
+		{"h", "kubectl get pods p", "kubectl logs p"},
+		{"d", "kubectl get pods p", "kubectl describe pods p"},
+		{"H", "kubectl get -f pods.yaml", ""},
+		{"D", "kubectl get -f pods.yaml -o name", "kubectl describe -f pods.yaml"},
+		{"D", "kubectl get -R -f dir deploy", "kubectl describe -R -f dir deploy"},
+		{"H", "kubectl get pods p -w --show-labels --sort-by .x", "kubectl logs p"},
+		{"H", "kubectl get pods p --kuberc k --proxy-url u", "kubectl logs --kuberc k --proxy-url u p"},
 	}
 	for _, c := range cases {
 		out, ok := apply(c.key, strings.Fields(c.in))

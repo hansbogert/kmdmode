@@ -34,7 +34,7 @@ check 'kubectl get pods -n ns pod1 ' H 'kubectl logs -n ns pod1 '
 check "kubectl get pod 'my pod' -o wide" H "kubectl logs 'my pod'"
 check 'kubectl get deploy d -n ns' D 'kubectl describe -n ns deploy d'
 check 'kubectl get deploy d' H 'kubectl get deploy d'
-check 'kgp pod1' H 'kubectl logs pod1'
+check 'kgp pod1' h 'kubectl logs pod1'
 check 'kubectl get pods p' $'\e'x 'kubectl get pods px'
 rm -f $out
 exit $fail
