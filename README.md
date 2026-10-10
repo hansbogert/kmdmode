@@ -22,7 +22,7 @@ runs the line.
 ## Install
 
 ```sh
-make            # builds bin/cmdmode
+make install    # builds bin/cmdmode and links kview into ~/.local/bin
 ```
 
 Then in `~/.zshrc`, after the plugins load:
@@ -61,7 +61,7 @@ all namespaces, `kview kubectl get <type> -A -o wide`. The type is the one `get`
 `delete`/... names, else pods (for `logs`, `exec`, bare `kubectl -n ns`); names and `-n` are
 dropped, context and `-l` carry over, and an existing `-o`/`-w` is replaced.
 
-`kview CMD...` (defined by the plugin) shows CMD's output in fzf: scroll it, type to filter, the
+`kview CMD...` (a script, linked onto PATH by `make install`) shows CMD's output in fzf: scroll it, type to filter, the
 first line stays pinned as the header, and CMD re-runs `$KVIEW_INTERVAL` (default 2) seconds after
 each refresh without blanking the list. ctrl-r refreshes now, Esc leaves. Without fzf it falls
 back to `watch`.

@@ -5,4 +5,7 @@ test: bin/cmdmode
 	go test ./...
 	./test.zsh
 
-.PHONY: test
+install: bin/cmdmode
+	ln -sf $(CURDIR)/kview $(HOME)/.local/bin/kview
+
+.PHONY: test install

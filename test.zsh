@@ -45,8 +45,8 @@ check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kubectl]
 check 'kubectl get pods p' $'h-f\r' 'ran: kubectl logs p -f'
 # kview: under a real tty, the header stays pinned and the rows refresh.
 kv=$(mktemp)
-print -r -- "stty rows 20 cols 100; source $root/cmdmode.plugin.zsh
-KVIEW_INTERVAL=0.3 kview zsh -c 'print NAME STATUS; print pod Running \$RANDOM'; print exit=\$?" >| $kv
+print -r -- "stty rows 20 cols 100
+KVIEW_INTERVAL=0.3 $root/kview zsh -c 'print NAME STATUS; print pod Running \$RANDOM'; print exit=\$?" >| $kv
 screen=$( (sleep 2; printf '\e') | timeout 10 script -qfc "zsh -f $kv" /dev/null | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')
 rows=$(print -r -- $screen | grep -oE 'Running [0-9]+' | sort -u | wc -l)
 if [[ $screen == *'NAME STATUS'* && $screen == *exit=0* ]] && (( rows >= 3 )); then
