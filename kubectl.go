@@ -256,15 +256,17 @@ func kubectlMode(cmd []string) (mode, bool) {
 // Subcommands whose first argument is a resource type (or TYPE/NAME).
 var typedSubs = set("get", "describe", "delete", "edit", "label", "annotate", "patch", "scale")
 
-// overview is the k9s-style list: every resource of the line's type in its namespace (or across
-// all with -A), wide and watching. Names are dropped; selectors and global flags carry over.
+// overview is the k9s-style list: every resource of the line's type across all namespaces, wide,
+// in kview (the plugin's live, scrollable view). Names are dropped; selectors and the other
+// global flags carry over.
 func (k kubectlCmd) overview() []string {
 	typ := "pods"
 	if typedSubs[k.sub] && len(k.pos) > 0 {
 		typ, _, _ = strings.Cut(k.pos[0], "/")
 	}
-	k = k.without("--output", "--watch", "--watch-only", "--filename", "--kustomize", "--recursive", "--raw")
-	return append(k.rebuild("get", typ), "-o", "wide", "-w")
+	k = k.without("--output", "--watch", "--watch-only", "--filename", "--kustomize", "--recursive",
+		"--raw", "--namespace", "--all-namespaces")
+	return append(append([]string{"kview"}, k.rebuild("get", typ)...), "-A", "-o", "wide")
 }
 
 // option toggles a flag: on removes it, a different value is replaced, absent is added.

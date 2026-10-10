@@ -88,6 +88,22 @@ _cmdmode_run() {
   zle accept-line
 }
 
+# kview CMD...: a k9s-style live view of CMD's output. Scroll and filter it in fzf with the first
+# line pinned as the header; CMD re-runs $KVIEW_INTERVAL (2) seconds after each refresh, and
+# reload-sync keeps the old list on screen until the new one is complete. ctrl-r refreshes now.
+kview() {
+  local cmd="${(j: :)${(q-)@}} 2>&1" interval=${KVIEW_INTERVAL:-2}
+  if (( ! $+commands[fzf] )); then
+    watch -n $interval -- $cmd
+    return
+  fi
+  FZF_DEFAULT_COMMAND=$cmd fzf --header-lines=1 --layout=reverse --no-sort --info=inline \
+    --prompt="$* > " \
+    --bind "load:reload-sync(sleep $interval; $cmd)" \
+    --bind "ctrl-r:reload-sync($cmd)"
+  (( $? == 130 )) || return $?  # Esc is the normal way out, not a failure
+}
+
 zle -N cmdmode-enter _cmdmode_enter
 zle -N cmdmode-dispatch _cmdmode_dispatch
 zle -N cmdmode-escape _cmdmode_escape

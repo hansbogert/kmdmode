@@ -41,7 +41,18 @@ check 'kubectl get pods p' $'\e'x 'kubectl get pods px'
 check 'kubectl get pods p' 'h-ft' 'kubectl logs p -f --timestamps' '[f] -f*'
 check "kubectl get pods p" "h-f" "kubectl logs p -f" "[f] -f*  [p]"
 check 'kubectl logs -f p' '-f'$'\e''g' 'kubectl get pod p' 'cmdmode [kubectl logs -]'
-check 'kubectl -n ns ' O 'kubectl get -n ns pods -o wide -w ' 'cmdmode [kubectl]  [O] overview'
+check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kubectl]  [O] overview'
 check 'kubectl get pods p' $'h-f\r' 'ran: kubectl logs p -f'
-rm -f $out
+# kview: under a real tty, the header stays pinned and the rows refresh.
+kv=$(mktemp)
+print -r -- "stty rows 20 cols 100; source $root/cmdmode.plugin.zsh
+KVIEW_INTERVAL=0.3 kview zsh -c 'print NAME STATUS; print pod Running \$RANDOM'; print exit=\$?" >| $kv
+screen=$( (sleep 2; printf '\e') | timeout 10 script -qfc "zsh -f $kv" /dev/null | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')
+rows=$(print -r -- $screen | grep -oE 'Running [0-9]+' | sort -u | wc -l)
+if [[ $screen == *'NAME STATUS'* && $screen == *exit=0* ]] && (( rows >= 3 )); then
+  print "ok   kview: header pinned, $rows refreshes, Esc exits 0"
+else
+  print "FAIL kview: rows=$rows, screen: ${(q)screen[1,400]}"; fail=1
+fi
+rm -f $out $kv
 exit $fail

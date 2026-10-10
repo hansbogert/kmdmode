@@ -39,16 +39,16 @@ func TestApply(t *testing.T) {
 		{"G", "kubectl logs", ""},
 		{"H", "kubectl describe pod p -n ns", "kubectl logs -n ns p"},
 		{"G", "kubectl describe -f x.yaml", "kubectl get -f x.yaml"},
-		// overview: the type's full list, wide and watching, from any kubectl line.
-		{"O", "kubectl logs -n ns -f p --tail 5", "kubectl get -n ns pods -o wide -w"},
-		{"o", "kubectl get deploy/d -o yaml --context c", "kubectl get --context c deploy -o wide -w"},
-		{"O", "kubectl get pods -A -l app=x -w", "kubectl get -A -l app=x pods -o wide -w"},
-		{"O", "kubectl get -f x.yaml", "kubectl get pods -o wide -w"},
-		{"O", "kubectl describe svc s -n ns", "kubectl get -n ns svc -o wide -w"},
-		{"O", "kubectl exec -n ns -it p -- sh", "kubectl get -n ns pods -o wide -w"},
-		{"O", "kubectl delete deploy d -n ns", "kubectl get -n ns deploy -o wide -w"},
-		{"O", "kubectl -n ns", "kubectl get -n ns pods -o wide -w"},
-		{"O", "kubectl", "kubectl get pods -o wide -w"},
+		// overview: the type's full list across namespaces, wide, in kview, from any kubectl line.
+		{"O", "kubectl logs -n ns -f p --tail 5", "kview kubectl get pods -A -o wide"},
+		{"o", "kubectl get deploy/d -o yaml --context c", "kview kubectl get --context c deploy -A -o wide"},
+		{"O", "kubectl get pods -A -l app=x -w", "kview kubectl get -l app=x pods -A -o wide"},
+		{"O", "kubectl get -f x.yaml", "kview kubectl get pods -A -o wide"},
+		{"O", "kubectl describe svc s -n ns", "kview kubectl get svc -A -o wide"},
+		{"O", "kubectl exec -n ns -it p -- sh", "kview kubectl get pods -A -o wide"},
+		{"O", "kubectl delete deploy d -n ns", "kview kubectl get deploy -A -o wide"},
+		{"O", "kubectl -n ns", "kview kubectl get pods -A -o wide"},
+		{"O", "kubectl", "kview kubectl get pods -A -o wide"},
 	}
 	for _, c := range cases {
 		out, ok := run(c.key, false, strings.Fields(c.in))

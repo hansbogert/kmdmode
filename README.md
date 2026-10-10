@@ -56,10 +56,15 @@ The helper rewrites the last simple command that has an action, so env prefixes
 | `kubectl describe` | H logs (as for get), G get                | e `--show-events=false`                                |
 | any other `kubectl ...` | O overview                           |                                                        |
 
-**O overview** is in every kubectl mode: the k9s-style live list of the line's resource type,
-`kubectl get <type> -o wide -w`. The type is the one `get`/`describe`/`delete`/... names, else
-pods (for `logs`, `exec`, bare `kubectl -n ns`); names are dropped, namespace, context, `-l` and
-`-A` carry over, and an existing `-o`/`-w` is replaced.
+**O overview** is in every kubectl mode: a k9s-style live list of the line's resource type across
+all namespaces, `kview kubectl get <type> -A -o wide`. The type is the one `get`/`describe`/
+`delete`/... names, else pods (for `logs`, `exec`, bare `kubectl -n ns`); names and `-n` are
+dropped, context and `-l` carry over, and an existing `-o`/`-w` is replaced.
+
+`kview CMD...` (defined by the plugin) shows CMD's output in fzf: scroll it, type to filter, the
+first line stays pinned as the header, and CMD re-runs `$KVIEW_INTERVAL` (default 2) seconds after
+each refresh without blanking the list. ctrl-r refreshes now, Esc leaves. Without fzf it falls
+back to `watch`.
 
 An option toggles: on removes it, a different value (`-o yaml` when pressing o) is replaced,
 absent is added before any `--`.
