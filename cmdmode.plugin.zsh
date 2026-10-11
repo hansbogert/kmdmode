@@ -92,17 +92,27 @@ _cmdmode_run() {
   zle accept-line
 }
 
-# kview writes the command for a picked row here; the next prompt starts with it.
+# kview writes the command for a picked row here; the next prompt starts with it, already in
+# cmdmode, since acting on it is why you came back.
 export CMDMODE_PICK_FILE=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/cmdmode-pick.$$
+typeset -g _cmdmode_picked=
 
 _cmdmode_precmd() {
   [[ -s $CMDMODE_PICK_FILE ]] || return
   print -z -- "$(<$CMDMODE_PICK_FILE) "
   rm -f -- $CMDMODE_PICK_FILE
+  _cmdmode_picked=1
 }
 
-autoload -Uz add-zsh-hook
+_cmdmode_line_init() {
+  [[ -n $_cmdmode_picked ]] || return
+  _cmdmode_picked=
+  zle cmdmode-enter
+}
+
+autoload -Uz add-zsh-hook add-zle-hook-widget
 add-zsh-hook precmd _cmdmode_precmd
+add-zle-hook-widget line-init _cmdmode_line_init
 
 zle -N cmdmode-enter _cmdmode_enter
 zle -N cmdmode-dispatch _cmdmode_dispatch

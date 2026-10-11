@@ -75,10 +75,13 @@ it, type to filter, the first line stays pinned as the header, and CMD re-runs `
 through [kubecolor](https://github.com/kubecolor/kubecolor) when it is on PATH
 (`go install github.com/kubecolor/kubecolor@v0.8.0`).
 
-It has two layouts. `kubectl get` output is a **table**: the cursor follows its row across
-refreshes (by NAMESPACE and NAME, since READY and STATUS change), ctrl-z filters to faults, and
+It has two layouts. `kubectl get` output is a **table**: the cursor keeps its place across
+refreshes (its position, so a pod added or removed above it shifts which row that is; matching by
+name would block keys after each refresh and lose an Enter now and then), ctrl-z filters to
+faults, and
 Enter picks the row (below). Anything else, like `kubectl describe`, is a **document**: long lines
-wrap, and Enter just leaves. **W** (watch) in a get or describe mode wraps the line in kview.
+wrap, and Enter puts the command itself back on the prompt. Either way the prompt it returns to
+is already in cmdmode, so one key carries on (e.g. H for logs of the picked pod). **W** (watch) in a get or describe mode wraps the line in kview.
 
 kview fetches outside fzf: a background loop runs CMD into a file and then tells fzf, over a
 private socket, to reload from that file. While a reload runs, fzf drops cursor keys and holds

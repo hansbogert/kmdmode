@@ -69,29 +69,31 @@ drain() {
   repeat $1 { while zpty -rt t chunk; do :; done; sleep 0.05 }
 }
 
-check_pick() {  # check_pick KEYS WANT
+check_pick() {  # check_pick KEYS WANT [KEY pressed on the returned prompt]
   : >| $out
   zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
   zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
-  zpty -w t "_dump() { [[ -n \$BUFFER ]] && print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey '^T' _dump"
+  zpty -w t "_dump() { [[ -n \$BUFFER ]] && print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
   zpty -w t "KVIEW_INTERVAL=0.3 kview kubectl get pods -A -o wide"
   drain 30
   [[ -n $1 ]] && { zpty -w -n t $1; drain 20 }
   zpty -w -n t $'\r'
   drain 20
+  [[ -n $3 ]] && { zpty -w -n t $3; drain 10 }
   zpty -w -n t $'\x14'
   for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
   zpty -d t
   if [[ $(<$out) == "$2" ]]; then
-    print "ok   kview ${(q)1} Enter: next prompt is ${(q)$(<$out)}"
+    print "ok   kview ${(q)1} Enter ${3:+then $3}: next prompt is ${(q)$(<$out)}"
   else
     print "FAIL kview ${(q)1} Enter: next prompt is ${(q)$(<$out)}, want ${(q)2}"; fail=1
   fi
 }
 check_pick '' 'kubectl get -n kube-system pods coredns-x '
 check_pick $'\x1a' 'kubectl get -n kube-system pods bad-y '
+check_pick '' 'kubectl logs -n kube-system coredns-x ' h
 # kview keeps the cursor on its row across refreshes, though READY flips each time, and Enter on
-# a describe document leaves without putting anything on the prompt.
+# a describe document gives the describe line back.
 cat >| $fake/kubectl <<'SH'
 #!/bin/sh
 if [ "$1" = describe ]; then
@@ -101,12 +103,12 @@ r=$(( $(date +%s) % 2 ))
 echo "NAME READY STATUS"; i=1; while [ $i -le 40 ]; do echo "row-$i $r/1 Running"; i=$((i+1)); done
 SH
 rm -f $fake/kubecolor
-for c want in 'get pods' 'kubectl get pods row-6' 'describe pod p' ''; do
+for c want in 'get pods' 'kubectl get pods row-6' 'describe pod p' 'kubectl describe pod p'; do
   print -r -- "stty rows 12 cols 80; export PATH=$fake:\$PATH; unset CMDMODE_PICK_FILE
 KVIEW_INTERVAL=0.3 $root/kview kubectl $c; print exit=\$?" >| $kv
   screen=$( (sleep 1; printf '\016\016\016\016\016'; sleep 2.5; printf '\r'; sleep 1.5) |
     timeout 12 script -qfc "zsh -f $kv" /dev/null)
-  got=$(print -r -- $screen | grep -ao 'kubectl get pods row-[0-9]*')
+  got=$(print -r -- $screen | grep -aoE 'kubectl (get pods row-[0-9]+|describe pod p)' | tail -1)
   if [[ $got == "$want" && $screen == *exit=0* ]]; then
     print "ok   kview $c: 5 down, refreshes, Enter gives ${(q)got}"
   else
