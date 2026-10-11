@@ -8,6 +8,7 @@
 //	cmdmode apply KEY -- WORD...   print the line after action KEY; exit 1 if it does not apply
 //	cmdmode toggle KEY -- WORD...  print the line after toggling option KEY; exit 1 likewise
 //	cmdmode pick -- WORD...        print a command for the row on stdin, picked from WORD's output
+//	cmdmode select -- WORD...      like pick, for stdin's row then label lines: a get by selector
 //	cmdmode faults                 filter the kubectl table on stdin to its unhealthy rows
 package main
 
@@ -46,13 +47,21 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println(strings.Join(out, " "))
+	case len(args) >= 2 && args[0] == "select" && args[1] == "--":
+		in, _ := io.ReadAll(os.Stdin)
+		row, labels, _ := strings.Cut(string(in), "\n")
+		out, ok := kubectlSelect(args[2:], row, strings.Fields(labels))
+		if !ok {
+			os.Exit(1)
+		}
+		fmt.Println(strings.Join(out, " "))
 	case len(args) == 1 && args[0] == "faults":
 		if err := faults(os.Stdin, os.Stdout); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 	default:
-		fmt.Fprintln(os.Stderr, "usage: cmdmode menu|pick -- WORD... | cmdmode apply|toggle KEY -- WORD... | cmdmode faults")
+		fmt.Fprintln(os.Stderr, "usage: cmdmode menu|pick|select -- WORD... | cmdmode apply|toggle KEY -- WORD... | cmdmode faults")
 		os.Exit(2)
 	}
 }

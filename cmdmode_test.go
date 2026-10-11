@@ -134,6 +134,24 @@ func TestPick(t *testing.T) {
 	}
 }
 
+func TestSelect(t *testing.T) {
+	cases := []struct {
+		cmd, row, labels, want string
+	}{
+		{"kubectl get pods -A -o wide", "kube-system coredns-x 1/1 Running", "k8s-app=kube-dns tier=node",
+			"kubectl get -n kube-system pods -l k8s-app=kube-dns,tier=node"},
+		{"kubectl get --context c -l old=1 deploy -A", "ns d 1/1", "app=d",
+			"kubectl get --context c -n ns deploy -l app=d"},
+		{"kubectl get -n ns pods", "p 1/1 Running", "app=x", "kubectl get -n ns pods -l app=x"},
+		{"kubectl get all -A", "ns pod/p 1/1", "app=x", "kubectl get -n ns pod -l app=x"},
+		{"kubectl get pods -A", "ns p", "", ""},
+	}
+	for _, c := range cases {
+		out, ok := kubectlSelect(strings.Fields(c.cmd), c.row, strings.Fields(c.labels))
+		check(t, "select", c.cmd, c.want, out, ok)
+	}
+}
+
 func TestFaults(t *testing.T) {
 	in := strings.Join([]string{
 		"\x1b[1mNAMESPACE   NAME   READY   STATUS             RESTARTS   NOMINATED NODE",

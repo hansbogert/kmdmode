@@ -91,6 +91,28 @@ check_pick() {  # check_pick KEYS WANT [KEY pressed on the returned prompt]
     print "FAIL kview ${(q)1} Enter: next prompt is ${(q)$(<$out)}, want ${(q)2}"; fail=1
   fi
 }
+# Alt-Enter on a row: tick two of its labels, come back with a get by those labels.
+print -r -- $'#!/bin/sh\ncase "$*" in *go-template*) printf "k8s-app=kube-dns\\ntier=node\\nzone=a\\n"; exit;; esac' >| $fake/labels
+sed -i '1r '$fake/labels $fake/kubectl
+: >| $out
+zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
+zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
+zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+zpty -w t "KVIEW_INTERVAL=0.3 kview kubectl get pods -A -o wide"
+drain 30
+zpty -w -n t $'\e\r'
+drain 20
+zpty -w -n t $'\t\t\r'
+drain 20
+zpty -w -n t $'\x14'
+for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+zpty -d t
+if [[ $(<$out) == 'kubectl get -n kube-system pods -l k8s-app=kube-dns,tier=node ' ]]; then
+  print "ok   kview Alt-Enter, two labels ticked: ${(q)$(<$out)}"
+else
+  print "FAIL kview Alt-Enter labels: got ${(q)$(<$out)}"; fail=1
+fi
+
 check_pick '' 'kubectl get -n kube-system pods coredns-x '
 check_pick $'\x1a' 'kubectl get -n kube-system pods bad-y '
 check_pick '' 'kubectl logs -n kube-system coredns-x ' h

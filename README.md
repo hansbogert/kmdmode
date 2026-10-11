@@ -98,6 +98,11 @@ other than Running/Completed/Succeeded, or a READY count short of its total (whi
 deployments and statefulsets). The filter is `cmdmode faults`, which kview pipes the command
 through while the toggle is on.
 
+**Alt-Enter** on a row fetches its labels into a second fzf: tick any (Tab), Enter, and you are
+back in cmdmode on a get of everything of that type in the row's namespace carrying them, e.g.
+`kubectl get -n cert-manager pods -l app=cert-manager,app.kubernetes.io/component=controller`.
+(Shift-Enter would be nicer, but most terminals, GNOME Terminal included, send it as plain Enter.)
+
 **Enter** on a row puts a command for that resource on your next prompt, e.g. Enter on
 `kube-system coredns-x ...` gives `kubectl get -n kube-system pods coredns-x`, ready for Alt-m.
 kview writes the line to `$CMDMODE_PICK_FILE` and the plugin's precmd hook loads it with

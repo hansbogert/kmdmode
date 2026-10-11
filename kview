@@ -3,10 +3,12 @@
 # line pinned as the header; CMD re-runs $KVIEW_INTERVAL (2) seconds after each refresh, and the
 # cursor keeps its place in the list across refreshes. ctrl-r refreshes now.
 #
-# "kubectl get" output is a table: ctrl-z shows only faulty rows (cmdmode faults), and Enter puts
-# a command for the picked row (e.g. "kubectl get -n NS pods NAME") on the next prompt. Anything
-# else, like "kubectl describe", is a document: long lines wrap, and Enter puts CMD itself on the
-# next prompt. Either prompt opens in cmdmode, so one key carries on. Esc leaves with an empty one.
+# "kubectl get" output is a table: ctrl-z shows only faulty rows (cmdmode faults), Enter puts a
+# command for the picked row (e.g. "kubectl get -n NS pods NAME") on the next prompt, and Alt-Enter
+# lets you tick the row's labels for a get by selector instead (shift-enter can't be told apart
+# from Enter in most terminals). Anything else, like "kubectl describe", is a document: long lines
+# wrap, and Enter puts CMD itself on the next prompt. Either prompt opens in cmdmode, so one key
+# carries on. Esc leaves with an empty one.
 #
 # kubectl output is colored through kubecolor when it is installed. Uses the fzf that make
 # installs into bin/ (needs fzf 0.59+ for --wrap and trigger), else falls back to watch.
@@ -34,7 +36,8 @@ if [[ $1 == kubectl && ${@[(I)get]} -gt 0 ]]; then
   # ctrl-z (as in k9s) toggles a filter down to faulty rows; the state is whether $faults exists.
   faults=$run/faults
   src="$cmd | { if [ -e $faults ]; then $here/bin/cmdmode faults; else cat; fi; }"
-  opts+=(--header="enter: pick  ctrl-z: faults only  ctrl-r: refresh  esc: quit"
+  opts+=(--expect=alt-enter
+    --header="enter: pick  alt-enter: by labels  ctrl-z: faults only  ctrl-r: refresh  esc: quit"
     --bind "ctrl-z:execute-silent([ -e $faults ] && rm -f $faults || touch $faults; touch $run/now)")
 else
   src=$cmd document=1
@@ -67,7 +70,17 @@ rc=$?
 if [[ -n $document ]]; then
   line=${(j: :)${(@q-)@}}
 else
+  # --expect puts the key that ended fzf (empty for Enter) on the line before the row.
+  key=${row%%$'\n'*} row=${row#*$'\n'}
   line=$($here/bin/cmdmode pick -- ${(q-)@} <<<$row) || line=$row
+  if [[ $key == alt-enter ]]; then
+    # Alt-Enter: tick some of the row's labels, and get everything of its type carrying them.
+    get=(${(Q)${(z)line}})
+    labels=$("${get[@]}" -o 'go-template={{range $k, $v := .metadata.labels}}{{$k}}={{$v}}{{"\n"}}{{end}}' 2>&1 |
+      $fzf --multi --layout=reverse --prompt="labels of ${get[-1]} > " \
+        --header="tab: select  enter: done  esc: cancel") || exit 0
+    line=$($here/bin/cmdmode select -- ${(q-)@} <<<"$row"$'\n'"$labels") || exit 1
+  fi
 fi
 if [[ -n $CMDMODE_PICK_FILE ]]; then
   print -r -- $line >| $CMDMODE_PICK_FILE

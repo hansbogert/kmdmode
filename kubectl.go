@@ -320,29 +320,55 @@ func (k kubectlCmd) overview() []string {
 // resource: NAMESPACE and NAME come from the row's leading columns (NAMESPACE only with -A),
 // replacing -A with -n NS and dropping output and watch flags.
 func kubectlPick(cmd []string, row string) ([]string, bool) {
-	k, ok := parseKubectl(cmd)
-	fields := strings.Fields(row)
-	if !ok || k.sub != "get" || len(fields) == 0 {
+	k, ns, typ, name, ok := pickedResource(cmd, row)
+	if !ok {
 		return nil, false
 	}
+	if typ == "" { // TYPE/NAME, as "get all" lists them
+		return append(append(k.rebuild("get"), ns...), name), true
+	}
+	return append(append(k.rebuild("get"), ns...), typ, name), true
+}
+
+// kubectlSelect is kubectlPick for labels chosen from the picked resource: a get of everything of
+// its type in its namespace carrying all of them, replacing any selector the list had.
+func kubectlSelect(cmd []string, row string, labels []string) ([]string, bool) {
+	k, ns, typ, name, ok := pickedResource(cmd, row)
+	if !ok || len(labels) == 0 {
+		return nil, false
+	}
+	if typ == "" {
+		typ, _, _ = strings.Cut(name, "/")
+	}
+	k = k.without("--selector")
+	return append(append(k.rebuild("get"), ns...), typ, "-l", strings.Join(labels, ",")), true
+}
+
+// pickedResource parses a row of "kubectl get" output: the command minus output and scope flags,
+// the "-n NS" to replace -A with, and the resource's TYPE and NAME (TYPE empty when the row names
+// it as TYPE/NAME).
+func pickedResource(cmd []string, row string) (k kubectlCmd, ns []string, typ, name string, ok bool) {
+	k, ok = parseKubectl(cmd)
+	fields := strings.Fields(row)
+	if !ok || k.sub != "get" || len(fields) == 0 {
+		return k, nil, "", "", false
+	}
 	k = k.without("--output", "--watch", "--watch-only")
-	var ns []string
 	if k.has("--all-namespaces") {
 		if len(fields) < 2 {
-			return nil, false
+			return k, nil, "", "", false
 		}
 		ns, fields = []string{"-n", fields[0]}, fields[1:]
 		k = k.without("--all-namespaces", "--namespace")
 	}
-	res := []string{fields[0]} // TYPE/NAME, as "get all" lists them
-	if !strings.Contains(fields[0], "/") {
-		typ := "pods"
-		if len(k.pos) > 0 {
-			typ, _, _ = strings.Cut(k.pos[0], "/")
-		}
-		res = []string{typ, fields[0]}
+	if strings.Contains(fields[0], "/") {
+		return k, ns, "", fields[0], true
 	}
-	return append(append(k.rebuild("get"), ns...), res...), true
+	typ = "pods"
+	if len(k.pos) > 0 {
+		typ, _, _ = strings.Cut(k.pos[0], "/")
+	}
+	return k, ns, typ, fields[0], true
 }
 
 // option toggles a flag: on removes it, a different value is replaced, absent is added.
