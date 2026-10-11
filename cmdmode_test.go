@@ -100,6 +100,9 @@ func TestToggle(t *testing.T) {
 		{"f", "kubectl get pods", ""},
 		{"a", "kview kubectl get pods -A -o wide", "kview kubectl get pods -o wide"},
 		{"w", "kview kubectl get pods", "kview kubectl get pods -w"},
+		{"s", "kubectl get pods -A", "kubectl get pods -A --sort-by=.metadata.creationTimestamp"},
+		{"s", "kubectl get pods --sort-by=.metadata.creationTimestamp", "kubectl get pods"},
+		{"s", "kubectl get pods --sort-by .metadata.name", "kubectl get pods --sort-by=.metadata.creationTimestamp"},
 		{"a", "kview -c STATUS,IP kubectl get pods -A", "kview -c STATUS,IP kubectl get pods"},
 	}
 	for _, c := range cases {
@@ -129,6 +132,7 @@ func TestPick(t *testing.T) {
 		{"kubectl get --context c deploy -A -o wide", "ns d 1/1 1 1 5d",
 			"kubectl get --context c -n ns deploy d"},
 		{"kubectl get -n ns pods -o wide -w", "p 1/1 Running", "kubectl get -n ns pods p"},
+		{"kubectl get pods -A --sort-by=.metadata.creationTimestamp", "ns p 1/1", "kubectl get -n ns pods p"},
 		{"kubectl get all -A", "ns pod/p 1/1 Running", "kubectl get -n ns pod/p"},
 		{"kubectl get pods -A", "", ""},
 		{"ls -l", "x", ""},

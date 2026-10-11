@@ -54,7 +54,7 @@ The helper rewrites the last simple command that has an action, so env prefixes
 
 | Mode               | Actions                                       | Options (after `-`)                                    |
 |--------------------|-----------------------------------------------|--------------------------------------------------------|
-| `kubectl get`      | L logs, I describe, D delete, W watch, O overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels` |
+| `kubectl get`      | L logs, I describe, D delete, W watch, O overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels`, s sort by age |
 | `kubectl logs`     | G get, I describe, D delete, O overview       | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
 | `kubectl describe` | L logs, G get, D delete, W watch, O overview  | e `--show-events=false`                                |
 | `kubectl delete`   | L logs, G get, I describe, O overview         |                                                        |
@@ -105,6 +105,12 @@ or, the first time, everything but IP, NOMINATED NODE and READINESS GATES. `kvie
 starts with a choice, and leaving with Esc after changing columns returns that command, updated,
 in cmdmode. Columns are cut from kubectl's own table rather than `-o custom-columns`, which can't
 compute READY, a STATUS like CrashLoopBackOff, RESTARTS or AGE.
+
+**Alt-S** sorts by age, newest first, marked `[newest first]` in the header: kubectl's
+`--sort-by=.metadata.creationTimestamp` (oldest first) with the rows reversed, so the newest is at
+the top where the list starts. In plain kubectl output the same flag (the get option `s` under `-`)
+leaves the newest at the bottom, just above the prompt. Esc after toggling returns the command
+with or without the flag.
 
 **Alt-Enter** on a row fetches its labels into a second fzf: tick any (Tab), Enter, and you are
 back in cmdmode on a get of everything of that type in the row's namespace carrying them, e.g.

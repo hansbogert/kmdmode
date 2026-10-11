@@ -54,6 +54,7 @@ var kubectlOptions = map[string][]optionSpec{
 		{"y", "--output", "yaml", []string{"-o", "yaml"}},
 		{"a", "--all-namespaces", "", []string{"-A"}},
 		{"l", "--show-labels", "", []string{"--show-labels"}},
+		{"s", "--sort-by", ".metadata.creationTimestamp", []string{"--sort-by=.metadata.creationTimestamp"}},
 	},
 	"logs": {
 		{"f", "--follow", "", []string{"-f"}},
@@ -327,7 +328,8 @@ func kubectlPick(cmd []string, row string) ([]string, bool) {
 	if !ok {
 		return nil, false
 	}
-	if typ == "" { // TYPE/NAME, as "get all" lists them
+	k = k.without("--sort-by") // nothing to sort in one resource
+	if typ == "" {             // TYPE/NAME, as "get all" lists them
 		return append(append(k.rebuild("get"), ns...), name), true
 	}
 	return append(append(k.rebuild("get"), ns...), typ, name), true

@@ -227,5 +227,36 @@ else
   print "FAIL kview -c: ${(q)screen[1,300]}"; fail=1
 fi
 
+# Alt-S sorts by age, newest first: the fake lists oldest first only when given the sort, so the
+# top row after Alt-S is the newest. Esc returns the command with the sort.
+cat >| $fake/kubectl <<'SH'
+#!/bin/sh
+echo "NAMESPACE   NAME    READY   STATUS"
+case "$*" in
+  *creationTimestamp*) printf 'ns   old-a   1/1   Running\nns   mid-b   1/1   Running\nns   new-c   1/1   Running\n' ;;
+  *) printf 'ns   mid-b   1/1   Running\nns   new-c   1/1   Running\nns   old-a   1/1   Running\n' ;;
+esac
+SH
+for keys want in $'\es\r' 'kubectl get -n ns pods new-c ' $'\es\e' 'kview kubectl get pods -A --sort-by=.metadata.creationTimestamp '; do
+  : >| $out
+  zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
+  zpty -w t "stty rows 20 cols 140; PS1='> '; source $root/cmdmode.plugin.zsh"
+  zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+  zpty -w t "KVIEW_INTERVAL=0.5 kview kubectl get pods -A"
+  drain 30
+  zpty -w -n t ${keys[1,2]}
+  drain 30
+  zpty -w -n t ${keys[3,-1]}
+  drain 20
+  zpty -w -n t $'\x14'
+  for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+  zpty -d t
+  if [[ $(<$out) == "$want" ]]; then
+    print "ok   kview Alt-S then ${(q)keys[3,-1]}: ${(q)$(<$out)}"
+  else
+    print "FAIL kview Alt-S then ${(q)keys[3,-1]}: got ${(q)$(<$out)}, want ${(q)want}"; fail=1
+  fi
+done
+
 rm -rf $out $out.ran $kv $fake
 exit $fail

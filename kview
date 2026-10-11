@@ -4,12 +4,13 @@
 # and the cursor keeps its place in the list across refreshes. ctrl-r refreshes now.
 #
 # "kubectl get" output is a table: ctrl-z shows only faulty rows (cmdmode faults), Alt-L picks
-# which columns to show (-c gives them up front), Enter puts a command for the picked row (e.g.
+# which columns to show (-c gives them up front), Alt-S sorts by age, newest first (kubectl's
+# --sort-by=.metadata.creationTimestamp, reversed), Enter puts a command for the picked row (e.g.
 # "kubectl get -n NS pods NAME") on the next prompt, and Alt-Enter lets you tick the row's labels
 # for a get by selector instead (shift-enter can't be told apart from Enter in most terminals).
 # Anything else, like "kubectl describe", is a document: long lines wrap, and Enter puts CMD
 # itself on the next prompt. Either prompt opens in cmdmode, so one key carries on. Esc leaves
-# with an empty one, or, when the columns changed, with this view's command updated to them.
+# with an empty one, or, when the columns or sort changed, with this view's command updated.
 #
 # kubectl output is colored through kubecolor when it is installed. Uses the fzf that make
 # installs into bin/ (needs fzf 0.59+ for --wrap and trigger), else falls back to watch.
@@ -44,16 +45,22 @@ if [[ $1 == -c ]]; then
   cols=$2
   shift 2
 fi
-view=("$@")
-if [[ $1 == kubectl ]] && (( $+commands[kubecolor] )); then
-  view[1]=kubecolor
-  export KUBECOLOR_FORCE_COLORS=true  # it writes to fzf, not a terminal
-fi
-cmd="${(j: :)${(@q-)view}} 2>&1"
+# Alt-S toggles kubectl's age sort live, so the command comes in two versions, without and with.
+age=--sort-by=.metadata.creationTimestamp
+plain=(${@:#$age})
+sorted=
+(( ${@[(Ie)$age]} )) && sorted=1
+mkcmd() {
+  local -a v=("$@")
+  [[ $1 == kubectl ]] && (( $+commands[kubecolor] )) && v[1]=kubecolor
+  print -r -- "${(j: :)${(@q-)v}} 2>&1"
+}
+export KUBECOLOR_FORCE_COLORS=true  # kubecolor writes to fzf, not a terminal
+cmd=$(mkcmd $plain) cmd_age=$(mkcmd $plain $age)
 interval=${KVIEW_INTERVAL:-2}
 if [[ ! -x $fzf ]]; then
   print -u2 "kview: $fzf missing (run make in ${here}); falling back to watch"
-  exec watch -n $interval -- $cmd
+  exec watch -n $interval -- $(mkcmd "$@")
 fi
 
 run=$(mktemp -d ${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/kview.XXXXXX)
@@ -64,16 +71,24 @@ show="sh $run/filter < $run/raw"
 opts=(--ansi --track --header-lines=1 --layout=reverse --no-sort --info=inline --prompt="$* > ")
 if [[ $1 == kubectl && ${@[(I)get]} -gt 0 ]]; then
   # ctrl-z (as in k9s) shows only faulty rows while $run/faults exists; Alt-L writes the chosen
-  # columns to $run/columns.
+  # columns to $run/columns; Alt-S sorts by age while $run/sort exists, newest first: kubectl
+  # sorts oldest first, so the rows of a fetch made sorted ($run/sorted) are reversed.
   [[ -n $cols ]] && print -r -- $cols >| $run/columns
+  [[ -n $sorted ]] && touch $run/sort
   cat >| $run/filter <<EOF
 f=cat; [ -e $run/faults ] && f="$bin faults"
-if [ -s $run/columns ]; then \$f | $bin columns "\$(cat $run/columns)"; else \$f; fi
+{ if [ -s $run/columns ]; then \$f | $bin columns "\$(cat $run/columns)"; else \$f; fi; } |
+if [ -e $run/sorted ]; then
+  awk 'NR == 1 { print \$0 "  [newest first]"; next } { r[n++] = \$0 } END { while (n) print r[--n] }'
+else
+  cat
+fi
 EOF
   opts+=(--expect=alt-enter
-    --header="enter: pick  alt-enter: by labels  alt-l: columns  ctrl-z: faults only  ctrl-r: refresh  esc: quit"
+    --header="enter: pick  alt-enter: by labels  alt-l: columns  alt-s: by age  ctrl-z: faults  ctrl-r: refresh  esc: quit"
     --bind "ctrl-z:execute-silent([ -e $run/faults ] && rm -f $run/faults || touch $run/faults)+reload($show)"
-    --bind "alt-l:execute(${0:A} --pick-columns $run)+reload($show)")
+    --bind "alt-l:execute(${0:A} --pick-columns $run)+reload($show)"
+    --bind "alt-s:execute-silent([ -e $run/sort ] && rm -f $run/sort || touch $run/sort; touch $run/now)")
 else
   print -r -- cat >| $run/filter
   document=1
@@ -84,10 +99,14 @@ fi
 # keys for a moment after every reload, so an Enter could be lost; --track alone keeps the
 # cursor's position instead. This ticker runs the command into $run/raw, then presses f12 over
 # fzf's private socket, which reloads from that file in milliseconds. It fetches at once, then
-# $interval seconds after each fetch, or sooner when ctrl-r touches $run/now.
+# $interval seconds after each fetch, or sooner when ctrl-r or Alt-S touch $run/now.
 {
   while :; do
-    eval $cmd >| $run/next && mv $run/next $run/raw
+    if [[ -e $run/sort ]]; then
+      eval $cmd_age >| $run/next && mv $run/next $run/raw && touch $run/sorted
+    else
+      eval $cmd >| $run/next && mv $run/next $run/raw && rm -f $run/sorted
+    fi
     curl -s --unix-socket $run/fzf.sock -d 'trigger(f12)' http://localhost >/dev/null
     for (( t = 0; t < interval * 10; t++ )); do [[ -e $run/now ]] && break; sleep 0.1; done
     rm -f $run/now
@@ -98,10 +117,13 @@ row=$(FZF_DEFAULT_COMMAND="while [ ! -e $run/raw ]; do sleep 0.1; done; $show" $
   --listen=$run/fzf.sock --bind "f12:reload($show)" --bind "ctrl-r:execute-silent(touch $run/now)")
 rc=$?
 if (( rc == 130 )); then  # Esc is the normal way out, not a failure
-  chosen=
+  chosen= sort_now=
   [[ -e $run/columns ]] && chosen=$(<$run/columns)
-  [[ $chosen == "$cols" ]] && exit 0
-  line="kview -c ${(q-)chosen} ${(j: :)${(@q-)@}}"
+  [[ -e $run/sort ]] && sort_now=1
+  [[ $chosen == "$cols" && $sort_now == "$sorted" ]] && exit 0
+  final=($plain)
+  [[ -n $sort_now ]] && final+=($age)
+  line="kview ${chosen:+-c ${(q-)chosen} }${(j: :)${(@q-)final}}"
 elif (( rc )); then
   exit $rc
 elif [[ -n $document ]]; then
