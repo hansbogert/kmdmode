@@ -44,7 +44,7 @@ check 'kubectl logs -f p' '-f'$'\e''g' 'kubectl get pod p' 'cmdmode [kubectl log
 check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kubectl]  [O] overview'
 check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kview kubectl get]  [W] unwatch'
 check 'kubectl -n ns ' OW 'kubectl get pods -A -o wide '
-check 'kubectl get pods p' $'h-f\r' 'ran: kubectl logs p -f'
+check 'kubectl get pods p' $'h-f\r' 'kubectl logs p -f'  # ran, and came back in cmdmode
 # kview: under a real tty, the header stays pinned and the rows refresh.
 kv=$(mktemp)
 print -r -- "stty rows 20 cols 100
@@ -146,5 +146,27 @@ else
   print "FAIL empty prompt + Alt-m recall: got ${(q)$(<$out)}"; fail=1
 fi
 
-rm -rf $out $kv $fake
+# A line run from cmdmode comes back in cmdmode: G then acts on it. Esc on that untouched
+# returned line clears it.
+for keys want in g 'kubectl get -n ns pod p' $'\e' ''; do
+  : >| $out
+  zpty -b t "env -i HOME=$HOME TERM=xterm zsh -f -i"
+  rm -f $out.ran
+  zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { print -rn -- \"\$*\" >| $out.ran }"
+  zpty -w t "_dump() { print -rn -- \"[\$BUFFER]\" >| $out }; zle -N _dump"
+  zpty -w t "bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
+  drain 10
+  zpty -w -n t "kubectl logs -n ns p"$'\em\r'
+  drain 10
+  zpty -w -n t "$keys"$'\x14'
+  for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+  zpty -d t
+  if [[ $(<$out) == "[$want]" && $(<$out.ran) == 'logs -n ns p' ]]; then
+    print "ok   run from cmdmode, back in cmdmode, ${(q)keys}: ${(q)$(<$out)}"
+  else
+    print "FAIL run from cmdmode, back in cmdmode, ${(q)keys}: got ${(q)$(<$out)}, want [$want]; ran ${(q)$(<$out.ran)}"; fail=1
+  fi
+done
+
+rm -rf $out $out.ran $kv $fake
 exit $fail

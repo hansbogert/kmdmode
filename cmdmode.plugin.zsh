@@ -100,30 +100,42 @@ _cmdmode_escape() {
     _cmdmode_options=
     _cmdmode_render
   else
+    # On a prompt cmdmode came back to, Esc means done with it: the untouched line goes too.
+    [[ -n $_cmdmode_returned && $BUFFER == "$_cmdmode_returned" ]] && BUFFER=
     _cmdmode_leave
   fi
 }
 
+# A line run from cmdmode comes back in cmdmode once it ends (after logs -f, on ctrl-c), so you
+# carry on from it.
 _cmdmode_run() {
+  _cmdmode_rerun=$BUFFER
   _cmdmode_leave
   zle accept-line
 }
 
-# kview writes the command for a picked row here; the next prompt starts with it, already in
-# cmdmode, since acting on it is why you came back.
+# kview writes the command for a picked row here. The next prompt starts with it, or else with
+# the line run from cmdmode, already in cmdmode, since acting on it is why you came back.
 export CMDMODE_PICK_FILE=${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/cmdmode-pick.$$
-typeset -g _cmdmode_picked=
+typeset -g _cmdmode_picked= _cmdmode_rerun= _cmdmode_returned=
 
 _cmdmode_precmd() {
-  [[ -s $CMDMODE_PICK_FILE ]] || return
-  print -z -- "$(<$CMDMODE_PICK_FILE) "
-  rm -f -- $CMDMODE_PICK_FILE
-  _cmdmode_picked=1
+  if [[ -s $CMDMODE_PICK_FILE ]]; then
+    print -z -- "$(<$CMDMODE_PICK_FILE) "
+    rm -f -- $CMDMODE_PICK_FILE
+    _cmdmode_picked=1
+  elif [[ -n $_cmdmode_rerun ]]; then
+    print -z -- "$_cmdmode_rerun"
+    _cmdmode_picked=1
+  fi
+  _cmdmode_rerun=
 }
 
 _cmdmode_line_init() {
+  _cmdmode_returned=
   [[ -n $_cmdmode_picked ]] || return
   _cmdmode_picked=
+  _cmdmode_returned=$BUFFER
   zle cmdmode-enter
 }
 
