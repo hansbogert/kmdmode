@@ -70,8 +70,9 @@ pods picked by `-l`.
 
 **O overview** is in every kubectl mode: a k9s-style live list of the line's resource type across
 all namespaces, `kview kubectl get <type> -A -o wide`. The type is the one `get`/`describe`/
-`delete`/... names, else pods (for `logs`, `exec`, bare `kubectl -n ns`); names and `-n` are
-dropped, context and `-l` carry over, and an existing `-o`/`-w` is replaced.
+`delete`/... names, else pods (for `logs`, `exec`, bare `kubectl -n ns`). It is the same view from
+any line: only the flags that pick the cluster and identity (`--context`, `--kubeconfig`, `--as`,
+...) carry over; names, `-n`, `-l` and other selectors, sorting and output flags reset.
 
 `kview CMD...` (a script, linked onto PATH by `make install`) shows CMD's output in fzf: scroll
 it, type to filter, the first line stays pinned as the header, and CMD re-runs `$KVIEW_INTERVAL`

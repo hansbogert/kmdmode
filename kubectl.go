@@ -304,15 +304,18 @@ func namesResources(k kubectlCmd) bool {
 var typedSubs = set("get", "describe", "delete", "edit", "label", "annotate", "patch", "scale")
 
 // overview is the k9s-style list: every resource of the line's type across all namespaces, wide,
-// in kview (the plugin's live, scrollable view). Names are dropped; selectors and the other
-// global flags carry over.
+// in kview (the plugin's live, scrollable view). It is the same view from any line: only the flags
+// that pick the cluster and identity (--context, --kubeconfig, --as, ...) carry over; names,
+// selectors, sorting and the rest reset.
 func (k kubectlCmd) overview() []string {
 	typ := "pods"
 	if typedSubs[k.sub] && len(k.pos) > 0 {
 		typ, _, _ = strings.Cut(k.pos[0], "/")
 	}
-	k = k.without("--output", "--watch", "--watch-only", "--filename", "--kustomize", "--recursive",
-		"--raw", "--namespace", "--all-namespaces")
+	k.flags = slices.DeleteFunc(slices.Clone(k.flags), func(f kflag) bool {
+		_, global := kubectlFlagTables[""].value[f.long]
+		return !global || f.long == "--namespace"
+	})
 	return append(append([]string{"kview"}, k.rebuild("get", typ)...), "-A", "-o", "wide")
 }
 

@@ -64,7 +64,10 @@ func TestApply(t *testing.T) {
 		// overview: the type's full list across namespaces, wide, in kview, from any kubectl line.
 		{"O", "kubectl logs -n ns -f p --tail 5", "kview kubectl get pods -A -o wide"},
 		{"o", "kubectl get deploy/d -o yaml --context c", "kview kubectl get --context c deploy -A -o wide"},
-		{"O", "kubectl get pods -A -l app=x -w", "kview kubectl get -l app=x pods -A -o wide"},
+		{"O", "kubectl get pods -A -l app=x -w", "kview kubectl get pods -A -o wide"},
+		{"O", "kubectl get -n ns pods -l app=x,tier=y --field-selector a=b --sort-by .x --show-labels --context c",
+			"kview kubectl get --context c pods -A -o wide"},
+		{"O", "kubectl logs -l app=x --kubeconfig k --as u -f", "kview kubectl get --kubeconfig k --as u pods -A -o wide"},
 		{"O", "kubectl get -f x.yaml", "kview kubectl get pods -A -o wide"},
 		{"O", "kubectl describe svc s -n ns", "kview kubectl get svc -A -o wide"},
 		{"O", "kubectl exec -n ns -it p -- sh", "kview kubectl get pods -A -o wide"},
