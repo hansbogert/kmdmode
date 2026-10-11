@@ -56,6 +56,7 @@ The helper rewrites the last simple command that has an action, so env prefixes
 | `kubectl describe` | H logs, G get, D delete, W watch, O overview  | e `--show-events=false`                                |
 | `kubectl delete`   | H logs, G get, I describe, O overview         |                                                        |
 | any other `kubectl ...` | O overview                               |                                                        |
+| `kview kubectl ...` (after W or O) | W unwatch (drops kview)    | those of the kubectl command inside, kview kept        |
 
 I is describe as in "inspect", leaving D for delete. **D is offered only when the line names
 specific resources** (`pods p`, `deploy/d`), never for a bare type, `-l`, `-A`, `--all` or `-f`,

@@ -57,6 +57,10 @@ func TestApply(t *testing.T) {
 		{"W", "kubectl describe pod p -n ns", "kview kubectl describe pod p -n ns"},
 		{"w", "kubectl get pods -n ns -w -o wide", "kview kubectl get pods -n ns -o wide"},
 		{"W", "kubectl logs -f p", ""},
+		// a kview line keeps a mode: W takes kview off, the inner command's actions are not offered.
+		{"W", "kview kubectl describe pod p -n ns", "kubectl describe pod p -n ns"},
+		{"H", "kview kubectl get pods p", ""},
+		{"O", "kview kubectl get pods -A -o wide", ""},
 		// overview: the type's full list across namespaces, wide, in kview, from any kubectl line.
 		{"O", "kubectl logs -n ns -f p --tail 5", "kview kubectl get pods -A -o wide"},
 		{"o", "kubectl get deploy/d -o yaml --context c", "kview kubectl get --context c deploy -A -o wide"},
@@ -90,6 +94,8 @@ func TestToggle(t *testing.T) {
 		{"w", "kubectl get pods | less", "kubectl get pods -w | less"},
 		{"e", "kubectl describe pod p", "kubectl describe pod p --show-events=false"},
 		{"f", "kubectl get pods", ""},
+		{"a", "kview kubectl get pods -A -o wide", "kview kubectl get pods -o wide"},
+		{"w", "kview kubectl get pods", "kview kubectl get pods -w"},
 	}
 	for _, c := range cases {
 		out, ok := run(c.key, true, strings.Fields(c.in))
@@ -164,6 +170,19 @@ func TestFaults(t *testing.T) {
 	faults(strings.NewReader("error: You must be logged in\nmore\n"), &out)
 	if got := out.String(); got != "error: You must be logged in\nmore\n" {
 		t.Errorf("non-table: got %q", got)
+	}
+}
+
+func TestKviewMenu(t *testing.T) {
+	m, ok := modeFor(strings.Fields("kview kubectl get pods -A -o wide"))
+	if !ok || m.name != "kview kubectl get" {
+		t.Fatalf("got mode %q (ok=%v), want kview kubectl get", m.name, ok)
+	}
+	if len(m.actions) != 1 || m.actions[0].key != "W" {
+		t.Errorf("actions: got %d, want only W", len(m.actions))
+	}
+	if len(m.options) == 0 {
+		t.Error("no options")
 	}
 }
 

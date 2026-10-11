@@ -42,6 +42,8 @@ check 'kubectl get pods p' 'h-ft' 'kubectl logs p -f --timestamps' '[f] -f*'
 check "kubectl get pods p" "h-f" "kubectl logs p -f" "[f] -f*  [p]"
 check 'kubectl logs -f p' '-f'$'\e''g' 'kubectl get pod p' 'cmdmode [kubectl logs -]'
 check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kubectl]  [O] overview'
+check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kview kubectl get]  [W] unwatch'
+check 'kubectl -n ns ' OW 'kubectl get pods -A -o wide '
 check 'kubectl get pods p' $'h-f\r' 'ran: kubectl logs p -f'
 # kview: under a real tty, the header stays pinned and the rows refresh.
 kv=$(mktemp)

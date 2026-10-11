@@ -27,7 +27,28 @@ type option struct {
 }
 
 func commandMode(cmd []string) (mode, bool) {
+	if len(cmd) > 1 && cmd[0] == "kview" {
+		return kviewMode(cmd[1:])
+	}
 	return kubectlMode(cmd)
+}
+
+// kviewMode is the mode of "kview CMD", as W and O write it: Enter runs it, the options toggle
+// CMD's flags with kview kept in front, and W takes kview off again. CMD's actions are left out,
+// since they would rewrite the line into things like "kview kubectl logs".
+func kviewMode(cmd []string) (mode, bool) {
+	inner, ok := kubectlMode(cmd)
+	if !ok {
+		return mode{}, false
+	}
+	m := mode{name: "kview " + inner.name}
+	m.actions = []action{{"W", "unwatch", func() []string { return cmd }}}
+	for _, o := range inner.options {
+		toggle := o.toggle
+		o.toggle = func() []string { return append([]string{"kview"}, toggle()...) }
+		m.options = append(m.options, o)
+	}
+	return m, true
 }
 
 // modeFor returns the mode of the command line's target command.
