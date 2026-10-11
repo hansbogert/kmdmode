@@ -322,14 +322,15 @@ func (k kubectlCmd) overview() []string {
 
 // kubectlPick turns a row picked from "kubectl get TYPE ..." output into a get of that one
 // resource: NAMESPACE and NAME come from the row's leading columns (NAMESPACE only with -A),
-// replacing -A with -n NS and dropping output and watch flags.
+// replacing -A with -n NS and dropping output, watch, sort and selector flags.
 func kubectlPick(cmd []string, row string) ([]string, bool) {
 	k, ns, typ, name, ok := pickedResource(cmd, row)
 	if !ok {
 		return nil, false
 	}
-	k = k.without("--sort-by") // nothing to sort in one resource
-	if typ == "" {             // TYPE/NAME, as "get all" lists them
+	// One named resource: nothing to sort, and kubectl rejects a name alongside a selector.
+	k = k.without("--sort-by", "--selector", "--field-selector")
+	if typ == "" { // TYPE/NAME, as "get all" lists them
 		return append(append(k.rebuild("get"), ns...), name), true
 	}
 	return append(append(k.rebuild("get"), ns...), typ, name), true

@@ -133,6 +133,9 @@ func TestPick(t *testing.T) {
 			"kubectl get --context c -n ns deploy d"},
 		{"kubectl get -n ns pods -o wide -w", "p 1/1 Running", "kubectl get -n ns pods p"},
 		{"kubectl get pods -A --sort-by=.metadata.creationTimestamp", "ns p 1/1", "kubectl get -n ns pods p"},
+		// a list reached by labels: kubectl rejects a name alongside a selector.
+		{"kubectl get -n ns pods -l app=x,tier=y --field-selector status.phase=Running", "p 1/1",
+			"kubectl get -n ns pods p"},
 		{"kubectl get all -A", "ns pod/p 1/1 Running", "kubectl get -n ns pod/p"},
 		{"kubectl get pods -A", "", ""},
 		{"ls -l", "x", ""},
