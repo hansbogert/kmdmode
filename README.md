@@ -24,18 +24,25 @@ runs the line.
 
 ## Install
 
+Needs zsh, Go 1.22+, curl and kubectl; [kubecolor](https://github.com/kubecolor/kubecolor) is
+optional (`go install github.com/kubecolor/kubecolor@v0.8.0`) and colors kview.
+
 ```sh
-make install    # builds bin/cmdmode and links kview into ~/.local/bin
+git clone <this repo> ~/src/cmdmode
+cd ~/src/cmdmode
+make install    # builds bin/cmdmode and bin/fzf (v0.74.4, for kview only), links kview into ~/.local/bin
 ```
 
-Then in `~/.zshrc`, after the plugins load:
+`~/.local/bin` must be on your PATH. Then in `~/.zshrc`, after your plugins load:
 
 ```zsh
 source ~/src/cmdmode/cmdmode.plugin.zsh
 ```
 
-Set `CMDMODE_KEY` before sourcing to use another key than Alt-m (which replaces zsh's
-`copy-prev-shell-word`), and `CMDMODE_BIN` to point at the helper elsewhere.
+and `exec zsh`. The plugin finds the helper next to itself, so any checkout path works. Set
+`CMDMODE_KEY` before sourcing to use another key than Alt-m (which replaces zsh's
+`copy-prev-shell-word`), and `CMDMODE_BIN` to point at the helper elsewhere. `make test` runs the
+Go tests and the zsh end-to-end tests.
 
 ## How it works
 
