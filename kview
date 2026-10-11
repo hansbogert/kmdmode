@@ -1,14 +1,15 @@
 #!/usr/bin/env zsh
-# kview CMD...: a k9s-style live view of CMD's output. Scroll and filter it in fzf with the first
-# line pinned as the header; CMD re-runs $KVIEW_INTERVAL (2) seconds after each refresh, and the
-# cursor keeps its place in the list across refreshes. ctrl-r refreshes now.
+# kview [-c COL,...] CMD...: a k9s-style live view of CMD's output. Scroll and filter it in fzf with
+# the first line pinned as the header; CMD re-runs $KVIEW_INTERVAL (2) seconds after each refresh,
+# and the cursor keeps its place in the list across refreshes. ctrl-r refreshes now.
 #
-# "kubectl get" output is a table: ctrl-z shows only faulty rows (cmdmode faults), Enter puts a
-# command for the picked row (e.g. "kubectl get -n NS pods NAME") on the next prompt, and Alt-Enter
-# lets you tick the row's labels for a get by selector instead (shift-enter can't be told apart
-# from Enter in most terminals). Anything else, like "kubectl describe", is a document: long lines
-# wrap, and Enter puts CMD itself on the next prompt. Either prompt opens in cmdmode, so one key
-# carries on. Esc leaves with an empty one.
+# "kubectl get" output is a table: ctrl-z shows only faulty rows (cmdmode faults), Alt-L picks
+# which columns to show (-c gives them up front), Enter puts a command for the picked row (e.g.
+# "kubectl get -n NS pods NAME") on the next prompt, and Alt-Enter lets you tick the row's labels
+# for a get by selector instead (shift-enter can't be told apart from Enter in most terminals).
+# Anything else, like "kubectl describe", is a document: long lines wrap, and Enter puts CMD
+# itself on the next prompt. Either prompt opens in cmdmode, so one key carries on. Esc leaves
+# with an empty one, or, when the columns changed, with this view's command updated to them.
 #
 # kubectl output is colored through kubecolor when it is installed. Uses the fzf that make
 # installs into bin/ (needs fzf 0.59+ for --wrap and trigger), else falls back to watch.
@@ -17,6 +18,32 @@
 emulate -L zsh
 here=${0:A:h}
 fzf=$here/bin/fzf
+bin=$here/bin/cmdmode
+
+# kview --pick-columns RUN: the Alt-L picker, run by fzf from inside a live view. Ticks what is
+# shown (or sane defaults), and writes the choice to RUN/columns for the view's filter.
+if [[ $1 == --pick-columns ]]; then
+  run=$2 current= load=first i=0
+  [[ -e $run/columns ]] && current=$(<$run/columns)
+  local -a items
+  for line in ${(f)"$($bin columns --list "$current" < $run/raw)"}; do
+    items+=(${line%%$'\t'*})
+    (( ++i ))
+    [[ $line == *$'\t'on ]] && load="pos($i)+toggle+$load"
+  done
+  chosen=$(print -rl -- $items | $fzf --multi --layout=reverse --prompt="columns > " \
+    --header="tab: toggle  enter: apply  esc: cancel  (NAMESPACE and NAME always stay)" \
+    --bind "load:$load") || exit 0
+  local -a picked=(${(f)chosen})
+  print -r -- ${(j:,:)${items:*picked}} >| $run/columns  # in table order, not ticking order
+  exit
+fi
+
+cols=
+if [[ $1 == -c ]]; then
+  cols=$2
+  shift 2
+fi
 view=("$@")
 if [[ $1 == kubectl ]] && (( $+commands[kubecolor] )); then
   view[1]=kubecolor
@@ -31,57 +58,69 @@ fi
 
 run=$(mktemp -d ${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/kview.XXXXXX)
 trap 'kill $ticker 2>/dev/null; rm -rf $run' EXIT
+# What fzf shows is $run/raw, the last fetch, through $run/filter. Toggles only change the filter's
+# state files and reload, so they apply at once instead of on the next fetch.
+show="sh $run/filter < $run/raw"
 opts=(--ansi --track --header-lines=1 --layout=reverse --no-sort --info=inline --prompt="$* > ")
 if [[ $1 == kubectl && ${@[(I)get]} -gt 0 ]]; then
-  # ctrl-z (as in k9s) toggles a filter down to faulty rows; the state is whether $faults exists.
-  faults=$run/faults
-  src="$cmd | { if [ -e $faults ]; then $here/bin/cmdmode faults; else cat; fi; }"
+  # ctrl-z (as in k9s) shows only faulty rows while $run/faults exists; Alt-L writes the chosen
+  # columns to $run/columns.
+  [[ -n $cols ]] && print -r -- $cols >| $run/columns
+  cat >| $run/filter <<EOF
+f=cat; [ -e $run/faults ] && f="$bin faults"
+if [ -s $run/columns ]; then \$f | $bin columns "\$(cat $run/columns)"; else \$f; fi
+EOF
   opts+=(--expect=alt-enter
-    --header="enter: pick  alt-enter: by labels  ctrl-z: faults only  ctrl-r: refresh  esc: quit"
-    --bind "ctrl-z:execute-silent([ -e $faults ] && rm -f $faults || touch $faults; touch $run/now)")
+    --header="enter: pick  alt-enter: by labels  alt-l: columns  ctrl-z: faults only  ctrl-r: refresh  esc: quit"
+    --bind "ctrl-z:execute-silent([ -e $run/faults ] && rm -f $run/faults || touch $run/faults)+reload($show)"
+    --bind "alt-l:execute(${0:A} --pick-columns $run)+reload($show)")
 else
-  src=$cmd document=1
+  print -r -- cat >| $run/filter
+  document=1
   opts+=(--wrap --header="enter: back to the prompt with it  ctrl-r: refresh  esc: quit")
 fi
 # Refresh outside fzf: while a reload is running fzf drops cursor keys and holds Enter, so it
 # must never wait on kubectl. Likewise no --id-nth: matching the selected row by identity blocks
 # keys for a moment after every reload, so an Enter could be lost; --track alone keeps the
-# cursor's position instead. This ticker runs the command into $run/out, then presses f12 over
+# cursor's position instead. This ticker runs the command into $run/raw, then presses f12 over
 # fzf's private socket, which reloads from that file in milliseconds. It fetches at once, then
-# $interval seconds after each fetch, or sooner when ctrl-r or ctrl-z touch $run/now.
+# $interval seconds after each fetch, or sooner when ctrl-r touches $run/now.
 {
   while :; do
-    eval $src >| $run/next && mv $run/next $run/out
+    eval $cmd >| $run/next && mv $run/next $run/raw
     curl -s --unix-socket $run/fzf.sock -d 'trigger(f12)' http://localhost >/dev/null
     for (( t = 0; t < interval * 10; t++ )); do [[ -e $run/now ]] && break; sleep 0.1; done
     rm -f $run/now
   done
 } &!
 ticker=$!
-# fzf only ever reads $run/out, starting with the ticker's first fetch.
-row=$(FZF_DEFAULT_COMMAND="while [ ! -e $run/out ]; do sleep 0.1; done; cat $run/out" $fzf $opts --listen=$run/fzf.sock \
-  --bind "f12:reload(cat $run/out)" \
-  --bind "ctrl-r:execute-silent(touch $run/now)")
+row=$(FZF_DEFAULT_COMMAND="while [ ! -e $run/raw ]; do sleep 0.1; done; $show" $fzf $opts \
+  --listen=$run/fzf.sock --bind "f12:reload($show)" --bind "ctrl-r:execute-silent(touch $run/now)")
 rc=$?
-(( rc == 130 )) && exit 0  # Esc is the normal way out, not a failure
-(( rc )) && exit $rc
-# Enter: a document gives back CMD, a table row a command for that row. The plugin's precmd hook
-# puts what lands in $CMDMODE_PICK_FILE on the next prompt; without the plugin, print it instead.
-if [[ -n $document ]]; then
+if (( rc == 130 )); then  # Esc is the normal way out, not a failure
+  chosen=
+  [[ -e $run/columns ]] && chosen=$(<$run/columns)
+  [[ $chosen == "$cols" ]] && exit 0
+  line="kview -c ${(q-)chosen} ${(j: :)${(@q-)@}}"
+elif (( rc )); then
+  exit $rc
+elif [[ -n $document ]]; then
   line=${(j: :)${(@q-)@}}
 else
   # --expect puts the key that ended fzf (empty for Enter) on the line before the row.
   key=${row%%$'\n'*} row=${row#*$'\n'}
-  line=$($here/bin/cmdmode pick -- ${(q-)@} <<<$row) || line=$row
+  line=$($bin pick -- ${(q-)@} <<<$row) || line=$row
   if [[ $key == alt-enter ]]; then
     # Alt-Enter: tick some of the row's labels, and get everything of its type carrying them.
     get=(${(Q)${(z)line}})
     labels=$("${get[@]}" -o 'go-template={{range $k, $v := .metadata.labels}}{{$k}}={{$v}}{{"\n"}}{{end}}' 2>&1 |
       $fzf --multi --layout=reverse --prompt="labels of ${get[-1]} > " \
         --header="tab: select  enter: done  esc: cancel") || exit 0
-    line=$($here/bin/cmdmode select -- ${(q-)@} <<<"$row"$'\n'"$labels") || exit 1
+    line=$($bin select -- ${(q-)@} <<<"$row"$'\n'"$labels") || exit 1
   fi
 fi
+# The plugin's precmd hook puts what lands in $CMDMODE_PICK_FILE on the next prompt; without the
+# plugin, print it instead.
 if [[ -n $CMDMODE_PICK_FILE ]]; then
   print -r -- $line >| $CMDMODE_PICK_FILE
 else

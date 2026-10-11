@@ -2,6 +2,7 @@ package main
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 )
 
@@ -28,15 +29,19 @@ type option struct {
 
 func commandMode(cmd []string) (mode, bool) {
 	if len(cmd) > 1 && cmd[0] == "kview" {
-		return kviewMode(cmd[1:])
+		if len(cmd) > 3 && cmd[1] == "-c" {
+			return kviewMode(cmd[:3], cmd[3:])
+		}
+		return kviewMode(cmd[:1], cmd[1:])
 	}
 	return kubectlMode(cmd)
 }
 
-// kviewMode is the mode of "kview CMD", as W and O write it: Enter runs it, the options toggle
-// CMD's flags with kview kept in front, and W takes kview off again. CMD's actions are left out,
-// since they would rewrite the line into things like "kview kubectl logs".
-func kviewMode(cmd []string) (mode, bool) {
+// kviewMode is the mode of "kview [-c COLS] CMD", as W, O and kview itself write it: Enter runs
+// it, the options toggle CMD's flags with the kview prefix kept in front, and W takes the prefix
+// off again. CMD's actions are left out, since they would rewrite the line into things like
+// "kview kubectl logs".
+func kviewMode(prefix, cmd []string) (mode, bool) {
 	inner, ok := kubectlMode(cmd)
 	if !ok {
 		return mode{}, false
@@ -45,7 +50,7 @@ func kviewMode(cmd []string) (mode, bool) {
 	m.actions = []action{{"W", "unwatch", func() []string { return cmd }}}
 	for _, o := range inner.options {
 		toggle := o.toggle
-		o.toggle = func() []string { return append([]string{"kview"}, toggle()...) }
+		o.toggle = func() []string { return append(slices.Clone(prefix), toggle()...) }
 		m.options = append(m.options, o)
 	}
 	return m, true

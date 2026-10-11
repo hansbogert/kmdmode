@@ -59,6 +59,7 @@ func TestApply(t *testing.T) {
 		{"W", "kubectl logs -f p", ""},
 		// a kview line keeps a mode: W takes kview off, the inner command's actions are not offered.
 		{"W", "kview kubectl describe pod p -n ns", "kubectl describe pod p -n ns"},
+		{"W", "kview -c STATUS,NODE kubectl get pods -A -o wide", "kubectl get pods -A -o wide"},
 		{"L", "kview kubectl get pods p", ""},
 		{"O", "kview kubectl get pods -A -o wide", ""},
 		// overview: the type's full list across namespaces, wide, in kview, from any kubectl line.
@@ -99,6 +100,7 @@ func TestToggle(t *testing.T) {
 		{"f", "kubectl get pods", ""},
 		{"a", "kview kubectl get pods -A -o wide", "kview kubectl get pods -o wide"},
 		{"w", "kview kubectl get pods", "kview kubectl get pods -w"},
+		{"a", "kview -c STATUS,IP kubectl get pods -A", "kview -c STATUS,IP kubectl get pods"},
 	}
 	for _, c := range cases {
 		out, ok := run(c.key, true, strings.Fields(c.in))

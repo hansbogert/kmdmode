@@ -190,5 +190,42 @@ for keys want in g 'kubectl get -n ns pod p' $'\e' ''; do
   fi
 done
 
+# Alt-L: untick READY in the column picker, the table drops it, and Esc returns in cmdmode on
+# the view's command updated to the chosen columns. A view started with -c shows only those.
+cat >| $fake/kubectl <<'SH'
+#!/bin/sh
+echo "NAMESPACE     NAME        READY   STATUS             RESTARTS   AGE   IP         NODE     NOMINATED NODE   READINESS GATES"
+echo "kube-system   coredns-x   1/1     Running            0          2d    10.0.0.1   node-a   <none>           <none>"
+SH
+: >| $out
+zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
+zpty -w t "stty rows 20 cols 140; PS1='> '; source $root/cmdmode.plugin.zsh"
+zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+zpty -w t "KVIEW_INTERVAL=0.5 kview kubectl get pods -A -o wide"
+drain 30
+zpty -w -n t $'\el'
+drain 30
+zpty -w -n t $'\t\r'
+drain 30
+zpty -w -n t $'\e'
+drain 20
+zpty -w -n t $'\x14'
+for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+zpty -d t
+if [[ $(<$out) == 'kview -c STATUS,RESTARTS,AGE,NODE kubectl get pods -A -o wide ' ]]; then
+  print "ok   kview Alt-L, READY unticked, Esc: ${(q)$(<$out)}"
+else
+  print "FAIL kview Alt-L columns: got ${(q)$(<$out)}"; fail=1
+fi
+print -r -- "stty rows 10 cols 140; export PATH=$fake:\$PATH
+$root/kview -c 'STATUS,NOMINATED NODE' kubectl get pods -A -o wide" >| $kv
+screen=$( (sleep 1.5; printf '\e'; sleep 1) | timeout 10 script -qfc "zsh -f $kv" /dev/null |
+  sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g' | tr -s ' ')
+if [[ $screen == *'NAMESPACE NAME STATUS NOMINATED NODE'* && $screen != *READY* ]]; then
+  print "ok   kview -c shows only those columns"
+else
+  print "FAIL kview -c: ${(q)screen[1,300]}"; fail=1
+fi
+
 rm -rf $out $out.ran $kv $fake
 exit $fail

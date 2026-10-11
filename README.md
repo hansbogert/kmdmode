@@ -99,6 +99,13 @@ other than Running/Completed/Succeeded, or a READY count short of its total (whi
 deployments and statefulsets). The filter is `cmdmode faults`, which kview pipes the command
 through while the toggle is on.
 
+**Alt-L** picks which of the table's columns to show (Tab toggles, Enter applies at once;
+NAMESPACE and NAME always stay, since picking a row reads them). It starts from what is shown,
+or, the first time, everything but IP, NOMINATED NODE and READINESS GATES. `kview -c COL,...`
+starts with a choice, and leaving with Esc after changing columns returns that command, updated,
+in cmdmode. Columns are cut from kubectl's own table rather than `-o custom-columns`, which can't
+compute READY, a STATUS like CrashLoopBackOff, RESTARTS or AGE.
+
 **Alt-Enter** on a row fetches its labels into a second fzf: tick any (Tab), Enter, and you are
 back in cmdmode on a get of everything of that type in the row's namespace carrying them, e.g.
 `kubectl get -n cert-manager pods -l app=cert-manager,app.kubernetes.io/component=controller`.

@@ -10,6 +10,8 @@
 //	cmdmode pick -- WORD...        print a command for the row on stdin, picked from WORD's output
 //	cmdmode select -- WORD...      like pick, for stdin's row then label lines: a get by selector
 //	cmdmode faults                 filter the kubectl table on stdin to its unhealthy rows
+//	cmdmode columns COL,...        keep only these columns (and NAMESPACE, NAME) of that table
+//	cmdmode columns --list [COL,...]  print its columns as "NAME on|off" for a picker
 package main
 
 import (
@@ -55,13 +57,27 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println(strings.Join(out, " "))
+	case len(args) >= 2 && args[0] == "columns" && args[1] == "--list":
+		var current []string
+		if len(args) > 2 && args[2] != "" {
+			current = strings.Split(args[2], ",")
+		}
+		if err := listColumns(os.Stdin, os.Stdout, current); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	case len(args) == 2 && args[0] == "columns":
+		if err := columns(os.Stdin, os.Stdout, strings.Split(args[1], ",")); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case len(args) == 1 && args[0] == "faults":
 		if err := faults(os.Stdin, os.Stdout); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
 	default:
-		fmt.Fprintln(os.Stderr, "usage: cmdmode menu|pick|select -- WORD... | cmdmode apply|toggle KEY -- WORD... | cmdmode faults")
+		fmt.Fprintln(os.Stderr, "usage: cmdmode menu|pick|select -- WORD... | cmdmode apply|toggle KEY -- WORD... | cmdmode faults | cmdmode columns [--list] COL,...")
 		os.Exit(2)
 	}
 }
