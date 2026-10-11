@@ -247,7 +247,7 @@ func kubectlMode(cmd []string) (mode, bool) {
 	switch k.sub {
 	case "get", "describe", "delete":
 		if logArgs, ok := podLogTarget(k); ok {
-			m.actions = append(m.actions, action{"H", "logs", func() []string {
+			m.actions = append(m.actions, action{"L", "logs", func() []string {
 				return k.rebuild("logs", logArgs...)
 			}})
 		}

@@ -1,5 +1,5 @@
 # cmdmode: press $CMDMODE_KEY (default Alt-m) to enter a modal keymap that rewrites the current
-# command line, e.g. "kubectl get pods -n ns pod1" then H gives "kubectl logs -n ns pod1".
+# command line, e.g. "kubectl get pods -n ns pod1" then L gives "kubectl logs -n ns pod1".
 # The message line names the mode ("kubectl get"); "-" lists that mode's flags to toggle.
 # The rewrite rules live in the Go helper; this file only owns the keymap and the buffer.
 

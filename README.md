@@ -6,7 +6,7 @@ Type `kubectl get pods -n ns pod1`, press **Alt-m**, and the message line names 
 keys:
 
 ```
-cmdmode [kubectl get]  [H] logs  [D] describe  [-] options  [Esc] exit  [Enter] run
+cmdmode [kubectl get]  [L] logs  [D] describe  [-] options  [Esc] exit  [Enter] run
 ```
 
 Press **H** and the line becomes `kubectl logs -n ns pod1`; the mode follows the line, so you are
@@ -54,10 +54,10 @@ The helper rewrites the last simple command that has an action, so env prefixes
 
 | Mode               | Actions                                       | Options (after `-`)                                    |
 |--------------------|-----------------------------------------------|--------------------------------------------------------|
-| `kubectl get`      | H logs, I describe, D delete, W watch, O overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels` |
+| `kubectl get`      | L logs, I describe, D delete, W watch, O overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels` |
 | `kubectl logs`     | G get, I describe, D delete, O overview       | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
-| `kubectl describe` | H logs, G get, D delete, W watch, O overview  | e `--show-events=false`                                |
-| `kubectl delete`   | H logs, G get, I describe, O overview         |                                                        |
+| `kubectl describe` | L logs, G get, D delete, W watch, O overview  | e `--show-events=false`                                |
+| `kubectl delete`   | L logs, G get, I describe, O overview         |                                                        |
 | any other `kubectl ...` | O overview                               |                                                        |
 | `kview kubectl ...` (after W or O) | W unwatch (drops kview)    | those of the kubectl command inside, kview kept        |
 
@@ -86,7 +86,7 @@ name would block keys after each refresh and lose an Enter now and then), ctrl-z
 faults, and
 Enter picks the row (below). Anything else, like `kubectl describe`, is a **document**: long lines
 wrap, and Enter puts the command itself back on the prompt. Either way the prompt it returns to
-is already in cmdmode, so one key carries on (e.g. H for logs of the picked pod). **W** (watch) in a get or describe mode wraps the line in kview.
+is already in cmdmode, so one key carries on (e.g. L for logs of the picked pod). **W** (watch) in a get or describe mode wraps the line in kview.
 
 kview fetches outside fzf: a background loop runs CMD into a file and then tells fzf, over a
 private socket, to reload from that file. While a reload runs, fzf drops cursor keys and holds

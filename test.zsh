@@ -32,19 +32,19 @@ check() {  # check LINE KEYS WANT [TEXT the terminal must show]
   fi
 }
 
-check 'kubectl get pods -n ns pod1 ' H 'kubectl logs -n ns pod1 ' 'cmdmode [kubectl logs]  [G] get'
-check "kubectl get pod 'my pod' -o wide" h "kubectl logs 'my pod'"
+check 'kubectl get pods -n ns pod1 ' L 'kubectl logs -n ns pod1 ' 'cmdmode [kubectl logs]  [G] get'
+check "kubectl get pod 'my pod' -o wide" l "kubectl logs 'my pod'"
 check 'kubectl get deploy d -n ns' I 'kubectl describe -n ns deploy d' 'cmdmode [kubectl get]  [I] describe  [D] delete'
-check 'kubectl get deploy d' H 'kubectl get deploy d' "no 'H' here"
-check 'kgp pod1' h 'kubectl logs pod1'
+check 'kubectl get deploy d' L 'kubectl get deploy d' "no 'L' here"
+check 'kgp pod1' l 'kubectl logs pod1'
 check 'kubectl get pods p' $'\e'x 'kubectl get pods px'
-check 'kubectl get pods p' 'h-ft' 'kubectl logs p -f --timestamps' '[f] -f*'
-check "kubectl get pods p" "h-f" "kubectl logs p -f" "[f] -f*  [p]"
+check 'kubectl get pods p' 'l-ft' 'kubectl logs p -f --timestamps' '[f] -f*'
+check "kubectl get pods p" "l-f" "kubectl logs p -f" "[f] -f*  [p]"
 check 'kubectl logs -f p' '-f'$'\e''g' 'kubectl get pod p' 'cmdmode [kubectl logs -]'
 check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kubectl]  [O] overview'
 check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kview kubectl get]  [W] unwatch'
 check 'kubectl -n ns ' OW 'kubectl get pods -A -o wide '
-check 'kubectl get pods p' $'h-f\r' 'kubectl logs p -f'  # ran, and came back in cmdmode
+check 'kubectl get pods p' $'l-f\r' 'kubectl logs p -f'  # ran, and came back in cmdmode
 # kview: under a real tty, the header stays pinned and the rows refresh.
 kv=$(mktemp)
 print -r -- "stty rows 20 cols 100
@@ -115,7 +115,7 @@ fi
 
 check_pick '' 'kubectl get -n kube-system pods coredns-x '
 check_pick $'\x1a' 'kubectl get -n kube-system pods bad-y '
-check_pick '' 'kubectl logs -n kube-system coredns-x ' h
+check_pick '' 'kubectl logs -n kube-system coredns-x ' l
 # kview keeps the cursor on its row across refreshes, though READY flips each time, and Enter on
 # a describe document gives the describe line back.
 cat >| $fake/kubectl <<'SH'
