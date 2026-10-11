@@ -16,7 +16,8 @@ now in `[kubectl logs]`. Press **-** for that mode's flags, each a key that togg
 cmdmode [kubectl logs -]  [f] -f*  [p] -p  [t] --timestamps  [c] --all-containers  ...  [Esc] back
 ```
 
-Keys are case-insensitive. **Esc** goes back from the options, then leaves the mode; **Enter**
+On an **empty prompt**, Alt-m brings back the most recent command (of the last 20) that has a
+mode, so after `kubectl logs ...` ends you carry on from it. Keys are case-insensitive. **Esc** goes back from the options, then leaves the mode; **Enter**
 runs the line.
 
 ## Install

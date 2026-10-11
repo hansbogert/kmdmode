@@ -51,7 +51,24 @@ _cmdmode_render() {
   zle -M "$msg"
 }
 
+# On an empty prompt, Alt-m starts from the most recent command in history that has a mode, so
+# after "kubectl logs ..." ends you can carry on from it. Looks back 20 commands at most.
+_cmdmode_recall() {
+  local n
+  local -a words
+  for n in ${${(Onk)history}[1,20]}; do
+    BUFFER=$history[$n]
+    _cmdmode_words
+    if [[ -n $("$_cmdmode_bin" menu -- "${words[@]}") ]]; then
+      CURSOR=$#BUFFER
+      return
+    fi
+  done
+  BUFFER=
+}
+
 _cmdmode_enter() {
+  [[ -z ${BUFFER//[[:space:]]/} ]] && _cmdmode_recall
   _cmdmode_prev_keymap=$KEYMAP
   _cmdmode_options=
   zle -K cmdmode

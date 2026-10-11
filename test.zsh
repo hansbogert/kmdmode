@@ -129,5 +129,22 @@ if (( ticks >= 3 )); then
 else
   print "FAIL kview describe refreshes: $ticks versions seen"; fail=1
 fi
+# Alt-m on an empty prompt recalls the last command with a mode, skipping ones without.
+: >| $out
+zpty -b t "env -i HOME=$HOME TERM=xterm zsh -f -i"
+zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { :; }"
+zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+zpty -w t "kubectl logs -n ns p --tail 5"
+zpty -w t "true"
+drain 10
+zpty -w -n t $'\em'g$'\x14'
+for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+zpty -d t
+if [[ $(<$out) == 'kubectl get -n ns pod p' ]]; then
+  print "ok   empty prompt + Alt-m recalls the logs line: G gives ${(q)$(<$out)}"
+else
+  print "FAIL empty prompt + Alt-m recall: got ${(q)$(<$out)}"; fail=1
+fi
+
 rm -rf $out $kv $fake
 exit $fail
