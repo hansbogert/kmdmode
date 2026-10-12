@@ -19,8 +19,12 @@ cmdmode [kubectl logs -]  [f] -f*  [p] -p  [t] --timestamps  [c] --all-container
 A line you **run from cmdmode** (Enter) comes back in cmdmode once it ends, e.g. after
 `kubectl logs -f` on ctrl-c, so the next key carries on from it; Esc on that returned line clears
 it. On an **empty prompt**, Alt-m brings back the most recent command (of the last 20) that has a
-mode, so after `kubectl logs ...` ends you carry on from it. Keys are case-insensitive. **Esc** goes back from the options, then leaves the mode; **Enter**
-runs the line.
+mode, so after `kubectl logs ...` ends you carry on from it. Keys are case-insensitive.
+
+**Esc** steps back one level: out of the option list, then undoing actions and toggles one at a
+time (each back to that line and its menu), then out of cmdmode; the hint says `[Esc] back` or
+`[Esc] exit`. So after a mistaken R, Esc returns to the line before it. S leaves cmdmode for the
+count, so there Alt-m then Esc gets back. **Enter** runs the line.
 
 ## Install
 

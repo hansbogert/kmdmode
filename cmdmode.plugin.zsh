@@ -7,6 +7,7 @@ typeset -g _cmdmode_bin=${CMDMODE_BIN:-${0:A:h}/bin/cmdmode}
 [[ -x $_cmdmode_bin ]] || _cmdmode_bin=cmdmode
 typeset -g _cmdmode_prev_keymap=main
 typeset -g _cmdmode_options=  # set while the "-" option list is shown
+typeset -ga _cmdmode_undo     # lines before each action or toggle on this command line
 
 # Fills $words from the buffer, expanding a leading alias so "kgp pod1" reads as kubectl.
 _cmdmode_words() {
@@ -42,10 +43,12 @@ _cmdmode_render() {
       option) [[ -n $_cmdmode_options ]] && msg+="  [$f[2]] $f[3]${${f[4]:#off}:+*}" ;;
     esac
   done
+  local esc=exit
+  (( $#_cmdmode_undo )) && esc=back
   if [[ -n $_cmdmode_options ]]; then
     msg="${1}cmdmode [$name -]${msg}  [Esc] back"
   else
-    msg="${1}cmdmode [$name]${msg}  [-] options  [Esc] exit  [Enter] run"
+    msg="${1}cmdmode [$name]${msg}  [-] options  [Esc] $esc  [Enter] run"
   fi
   (( $#msg < COLUMNS )) || msg="${msg[1,COLUMNS-2]}…"
   zle -M "$msg"
@@ -85,6 +88,7 @@ _cmdmode_dispatch() {
   _cmdmode_words
   local out
   if out=$("$_cmdmode_bin" ${${_cmdmode_options:+toggle}:-apply} "$KEYS" -- "${words[@]}"); then
+    _cmdmode_undo+=("$BUFFER")
     if [[ $out == *= ]]; then
       # A line ending in "=" (S's --replicas=) waits for a value: hand the keyboard back.
       BUFFER=$out
@@ -102,9 +106,17 @@ _cmdmode_dispatch() {
   fi
 }
 
+# Esc steps back one level: out of the option list, then undoing actions and toggles one at a
+# time (each back to that line and its menu), then out of cmdmode. After S has left cmdmode,
+# Alt-m then Esc gets back to the line before it.
 _cmdmode_escape() {
   if [[ -n $_cmdmode_options ]]; then
     _cmdmode_options=
+    _cmdmode_render
+  elif (( $#_cmdmode_undo )); then
+    BUFFER=$_cmdmode_undo[-1]
+    shift -p _cmdmode_undo
+    CURSOR=$#BUFFER
     _cmdmode_render
   else
     # On a prompt cmdmode came back to, Esc means done with it: the untouched line goes too.
@@ -139,6 +151,7 @@ _cmdmode_precmd() {
 }
 
 _cmdmode_line_init() {
+  _cmdmode_undo=()
   _cmdmode_returned=
   [[ -n $_cmdmode_picked ]] || return
   _cmdmode_picked=
