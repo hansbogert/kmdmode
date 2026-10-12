@@ -12,6 +12,7 @@ type mode struct {
 	name    string
 	actions []action
 	options []option
+	up      func() []string // the parent menu's line, or nil at a top menu
 }
 
 type action struct {
@@ -54,6 +55,18 @@ func kviewMode(prefix, cmd []string) (mode, bool) {
 		m.options = append(m.options, o)
 	}
 	return m, true
+}
+
+// up returns the line of the target command's parent menu (e.g. a rollout line's get), spliced
+// into the full line like run's result.
+func up(words []string) ([]string, bool) {
+	start, cmd, m, ok := target(words)
+	if !ok || m.up == nil {
+		return nil, false
+	}
+	out := append([]string{}, words[:start]...)
+	out = append(out, m.up()...)
+	return append(out, words[start+len(cmd):]...), true
 }
 
 // modeFor returns the mode of the command line's target command.

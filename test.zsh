@@ -46,10 +46,11 @@ check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kview ku
 check 'kubectl -n ns ' OW 'kubectl get pods -A -o wide '
 check 'kubectl get deploy d -n ns' R 'kubectl rollout restart -n ns deploy/d' 'cmdmode [kubectl rollout]'
 check 'kubectl get deploy d -n ns ' S3 'kubectl scale -n ns deploy/d --replicas=3'  # S leaves cmdmode
-check 'kubectl get deploy d -n ns' $'R\e' 'kubectl get deploy d -n ns' '[Esc] back'
-check 'kubectl get deploy d -n ns' $'R\eI' 'kubectl describe -n ns deploy d'
-check 'kubectl get deploy d -n ns' $'S\em\e' 'kubectl get deploy d -n ns'  # back from S, which left cmdmode
-check 'kubectl get pods p' $'L-f\e\e\e' 'kubectl get pods p'  # out of options, undo -f, undo L
+check 'kubectl get deploy d -n ns' $'R\e' 'kubectl get -n ns deploy/d' '[Esc] up'
+check 'kubectl get deploy d -n ns' $'R\eI' 'kubectl describe -n ns deploy/d'
+check 'kubectl get deploy d -n ns' $'S\em\e' 'kubectl get -n ns deploy/d'  # up from S, which left cmdmode
+check 'kubectl get pods p' $'L-f\e\e' 'kubectl get pod p'  # up out of options, then up from logs
+check 'kubectl get pods p' $'L-f\e' 'kubectl logs p -f'  # Esc keeps the toggle: up, not undo
 check 'kubectl get pods p' $'l-f\r' 'kubectl logs p -f'  # ran, and came back in cmdmode
 # kview: under a real tty, the header stays pinned and the rows refresh.
 kv=$(mktemp)
@@ -190,24 +191,23 @@ else
   print "FAIL Alt-m after rollout restart: got ${(q)$(<$out)}"; fail=1
 fi
 
-# Esc on a recalled line, untouched, goes back to the empty prompt; after an action, the first
-# Esc undoes it and the second clears the line.
-for keys in $'\e' $'g\e\e'; do
+# Esc on a recalled rollout line goes up to its workload's get menu; there, at the top, Esc exits.
+for keys want in $'\e' '[kubectl get -n ns deploy/d]' $'\e\e' '[kubectl get -n ns deploy/d]'; do
   : >| $out
   zpty -b t "env -i HOME=$HOME TERM=xterm zsh -f -i"
   zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { :; }"
-  zpty -w t "_dump() { print -rn -- \"[\$BUFFER]\" >| $out }; zle -N _dump; bindkey '^T' _dump"
+  zpty -w t "_dump() { print -rn -- \"[\$BUFFER]\" >| $out }; zle -N _dump; bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
   zpty -w t "kubectl rollout restart -n ns deploy/d"
   drain 10
   zpty -w -n t $'\em'$keys
-  drain 4
+  drain 12
   zpty -w -n t $'\x14'
   for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
   zpty -d t
-  if [[ $(<$out) == '[]' ]]; then
-    print "ok   recalled line, ${(q)keys}: back to an empty prompt"
+  if [[ $(<$out) == "$want" ]]; then
+    print "ok   recalled rollout line, ${(q)keys}: ${(q)$(<$out)}"
   else
-    print "FAIL recalled line, ${(q)keys}: got ${(q)$(<$out)}, want []"; fail=1
+    print "FAIL recalled rollout line, ${(q)keys}: got ${(q)$(<$out)}, want $want"; fail=1
   fi
 done
 

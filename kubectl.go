@@ -300,11 +300,40 @@ func kubectlMode(cmd []string) (mode, bool) {
 			return append([]string{"kview"}, k.dropFlags("--watch", "--watch-only")...)
 		}})
 	}
+	m.up = k.parent()
 	m.actions = append(m.actions, action{"O", "overview", k.overview})
 	for _, o := range kubectlOptions[k.sub] {
 		m.options = append(m.options, k.option(o))
 	}
 	return m, true
+}
+
+// parent is the menu above the line's: the get of the resource that a describe, delete, logs,
+// rollout or scale line acts on. A get line, a list and anything else are top menus (nil).
+func (k kubectlCmd) parent() func() []string {
+	var args []string
+	switch k.sub {
+	case "describe", "delete":
+		if !namesResources(k) {
+			return nil
+		}
+		args = k.pos
+	case "logs":
+		a, ok := logsResource(k)
+		if !ok {
+			return nil
+		}
+		args = a
+	case "rollout", "scale":
+		refs, ok := k.workloads()
+		if !ok {
+			return nil
+		}
+		args = refs
+	default:
+		return nil
+	}
+	return func() []string { return k.without("--output").rebuild("get", args...) }
 }
 
 // Subcommands that address resources alike ("TYPE NAME..." or "TYPE/NAME"), so a line converts

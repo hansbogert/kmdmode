@@ -234,6 +234,29 @@ func TestFaults(t *testing.T) {
 	}
 }
 
+func TestUp(t *testing.T) {
+	cases := []struct {
+		in, want string // want "" means a top menu
+	}{
+		{"kubectl rollout restart -n ns deploy/d", "kubectl get -n ns deploy/d"},
+		{"kubectl rollout status deploy/a deploy/b --context c", "kubectl get --context c deploy/a deploy/b"},
+		{"kubectl scale -n ns deploy/d --replicas=3", "kubectl get -n ns deploy/d"},
+		{"kubectl logs -n ns p -f --tail 5", "kubectl get -n ns pod p"},
+		{"kubectl logs -n ns deploy/d", "kubectl get -n ns deploy/d"},
+		{"kubectl describe -n ns pods p", "kubectl get -n ns pods p"},
+		{"kubectl delete -n ns deploy d", "kubectl get -n ns deploy d"},
+		{"kubectl get -n ns deploy d", ""},
+		{"kubectl get pods", ""},
+		{"kubectl describe pods -l app=x", ""},
+		{"kview kubectl get pods -A -o wide", ""},
+		{"ls", ""},
+	}
+	for _, c := range cases {
+		out, ok := up(strings.Fields(c.in))
+		check(t, "up", c.in, c.want, out, ok)
+	}
+}
+
 func TestKviewMenu(t *testing.T) {
 	m, ok := modeFor(strings.Fields("kview kubectl get pods -A -o wide"))
 	if !ok || m.name != "kview kubectl get" {

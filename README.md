@@ -21,10 +21,10 @@ A line you **run from cmdmode** (Enter) comes back in cmdmode once it ends, e.g.
 it. On an **empty prompt**, Alt-m brings back the most recent command (of the last 20) that has a
 mode, so after `kubectl logs ...` ends you carry on from it; Esc on it goes back to the empty prompt. Keys are case-insensitive.
 
-**Esc** steps back one level: out of the option list, then undoing actions and toggles one at a
-time (each back to that line and its menu), then out of cmdmode; the hint says `[Esc] back` or
-`[Esc] exit`. So after a mistaken R, Esc returns to the line before it. S leaves cmdmode for the
-count, so there Alt-m then Esc gets back. **Enter** runs the line.
+**Esc** goes up one menu: out of the option list (toggles kept), then from an action's menu
+(`logs`, `rollout`, `scale`, `describe`, `delete`) to the get menu of the resource it acts on,
+e.g. `kubectl rollout restart -n ns deploy/d` up to `kubectl get -n ns deploy/d`, then, at a top
+menu, out of cmdmode. The hint says `[Esc] up` or `[Esc] exit`. **Enter** runs the line.
 
 ## Install
 
