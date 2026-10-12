@@ -61,12 +61,17 @@ The helper rewrites the last simple command that has an action, so env prefixes
 
 | Mode               | Actions                                       | Options (after `-`)                                    |
 |--------------------|-----------------------------------------------|--------------------------------------------------------|
-| `kubectl get`      | L logs, I describe, D delete, W watch, O overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels`, s sort by age |
-| `kubectl logs`     | G get, I describe, D delete, O overview       | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
-| `kubectl describe` | L logs, G get, D delete, W watch, O overview  | e `--show-events=false`                                |
-| `kubectl delete`   | L logs, G get, I describe, O overview         |                                                        |
+| `kubectl get`      | L logs, I describe, D delete, R restart, S scale, W watch, O overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels`, s sort by age |
+| `kubectl logs`     | G get, I describe, D delete, R restart, S scale, O overview | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
+| `kubectl describe` | L logs, G get, D delete, R restart, S scale, W watch, O overview | e `--show-events=false`                                |
+| `kubectl delete`   | L logs, G get, I describe, R restart, S scale, O overview |                                                        |
 | any other `kubectl ...` | O overview                               |                                                        |
 | `kview kubectl ...` (after W or O) | W unwatch (drops kview)    | those of the kubectl command inside, kview kept        |
+
+**R** (`kubectl rollout restart`) and **S** (`kubectl scale ... --replicas=`) are offered for named
+workloads of a kind the command accepts: restart for deployments, statefulsets and daemonsets,
+scale for deployments, statefulsets and replicasets. S leaves cmdmode with the cursor after
+`--replicas=`, so you type the count and Enter.
 
 I is describe as in "inspect", leaving D for delete. **D is offered only when the line names
 specific resources** (`pods p`, `deploy/d`), never for a bare type, `-l`, `-A`, `--all` or `-f`,

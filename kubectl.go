@@ -262,6 +262,9 @@ func kubectlMode(cmd []string) (mode, bool) {
 				return k.without("--output").rebuild(v.sub, k.pos...)
 			}})
 		}
+		if namesResources(k) {
+			m.actions = append(m.actions, workloadActions(k, k.pos)...)
+		}
 	case "logs":
 		if args, ok := logsResource(k); ok {
 			for _, v := range resourceVerbs {
@@ -272,6 +275,9 @@ func kubectlMode(cmd []string) (mode, bool) {
 				m.actions = append(m.actions, action{v.key, v.sub, func() []string {
 					return k.rebuild(v.sub, args...)
 				}})
+			}
+			if !k.has("--selector") {
+				m.actions = append(m.actions, workloadActions(k, args)...)
 			}
 		}
 	}
@@ -299,6 +305,69 @@ func namesResources(k kubectlCmd) bool {
 		return false
 	}
 	return len(k.pos) >= 2 || len(k.pos) == 1 && strings.Contains(k.pos[0], "/")
+}
+
+// Workload kinds by every name kubectl accepts for them, to the short name used in TYPE/NAME.
+var workloadKinds = map[string]string{
+	"deploy": "deploy", "deployment": "deploy", "deployments": "deploy",
+	"sts": "sts", "statefulset": "sts", "statefulsets": "sts",
+	"ds": "ds", "daemonset": "ds", "daemonsets": "ds",
+	"rs": "rs", "replicaset": "rs", "replicasets": "rs",
+}
+
+// What "kubectl rollout restart" and "kubectl scale" accept: daemonsets have no replicas, and a
+// replicaset is restarted through its deployment.
+var (
+	restartable = set("deploy", "sts", "ds")
+	scalable    = set("deploy", "sts", "rs")
+)
+
+// workloadRefs turns named resources ("TYPE NAME..." or "TYPE/NAME") into TYPE/NAME refs, if all
+// are of a kind in allowed.
+func workloadRefs(pos []string, allowed map[string]bool) ([]string, bool) {
+	kindOf := func(typ string) (string, bool) {
+		typ, _, _ = strings.Cut(bare(typ), ".") // deployments.apps
+		kind, ok := workloadKinds[typ]
+		return kind, ok && allowed[kind]
+	}
+	var refs []string
+	switch {
+	case len(pos) == 1:
+		typ, name, ok := strings.Cut(bare(pos[0]), "/")
+		kind, known := kindOf(typ)
+		if !ok || !known || name == "" {
+			return nil, false
+		}
+		refs = []string{kind + "/" + name}
+	case len(pos) >= 2:
+		kind, known := kindOf(pos[0])
+		if !known {
+			return nil, false
+		}
+		for _, name := range pos[1:] {
+			refs = append(refs, kind+"/"+name)
+		}
+	default:
+		return nil, false
+	}
+	return refs, true
+}
+
+// workloadActions offers R (rollout restart) and S (scale) for named workloads. S ends the line
+// at "--replicas=", for the count to be typed.
+func workloadActions(k kubectlCmd, pos []string) []action {
+	var acts []action
+	if refs, ok := workloadRefs(pos, restartable); ok {
+		acts = append(acts, action{"R", "restart", func() []string {
+			return k.rebuild("rollout restart", refs...)
+		}})
+	}
+	if refs, ok := workloadRefs(pos, scalable); ok {
+		acts = append(acts, action{"S", "scale", func() []string {
+			return append(k.rebuild("scale", refs...), "--replicas=")
+		}})
+	}
+	return acts
 }
 
 // Subcommands whose first argument is a resource type (or TYPE/NAME).

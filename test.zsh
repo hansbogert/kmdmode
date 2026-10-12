@@ -44,6 +44,8 @@ check 'kubectl logs -f p' '-f'$'\e''g' 'kubectl get pod p' 'cmdmode [kubectl log
 check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kubectl]  [O] overview'
 check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kview kubectl get]  [W] unwatch'
 check 'kubectl -n ns ' OW 'kubectl get pods -A -o wide '
+check 'kubectl get deploy d -n ns' R 'kubectl rollout restart -n ns deploy/d' 'cmdmode [kubectl rollout]'
+check 'kubectl get deploy d -n ns ' S3 'kubectl scale -n ns deploy/d --replicas=3'  # S leaves cmdmode
 check 'kubectl get pods p' $'l-f\r' 'kubectl logs p -f'  # ran, and came back in cmdmode
 # kview: under a real tty, the header stays pinned and the rows refresh.
 kv=$(mktemp)

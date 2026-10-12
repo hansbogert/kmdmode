@@ -85,6 +85,13 @@ _cmdmode_dispatch() {
   _cmdmode_words
   local out
   if out=$("$_cmdmode_bin" ${${_cmdmode_options:+toggle}:-apply} "$KEYS" -- "${words[@]}"); then
+    if [[ $out == *= ]]; then
+      # A line ending in "=" (S's --replicas=) waits for a value: hand the keyboard back.
+      BUFFER=$out
+      CURSOR=$#BUFFER
+      _cmdmode_leave
+      return
+    fi
     # Keep a trailing space so you can carry on typing arguments.
     [[ $BUFFER == *[[:space:]] ]] && out+=' '
     BUFFER=$out
