@@ -211,9 +211,9 @@ for keys want in $'\e' '[kubectl get -n ns deploy/d]' $'\e\e' '[kubectl get -n n
   fi
 done
 
-# A line run from cmdmode comes back in cmdmode: G then acts on it. Esc on that untouched
-# returned line clears it.
-for keys want in g 'kubectl get -n ns pod p' $'\e' ''; do
+# A line run from cmdmode comes back in cmdmode: G then acts on it, and Esc goes up from the
+# logs menu to the pod's get menu.
+for keys want in g 'kubectl get -n ns pod p' $'\e' 'kubectl get -n ns pod p'; do
   : >| $out
   zpty -b t "env -i HOME=$HOME TERM=xterm zsh -f -i"
   rm -f $out.ran
@@ -300,6 +300,32 @@ for keys want in $'\es\r' 'kubectl get -n ns pods new-c ' $'\es\e' 'kview kubect
     print "FAIL kview Alt-S then ${(q)keys[3,-1]}: got ${(q)$(<$out)}, want ${(q)want}"; fail=1
   fi
 done
+
+# U: from a pod line to its owner (one lookup, against a fake cluster), and then R restarts it.
+cat >| $fake/kubectl <<'SH'
+#!/bin/sh
+case "$*" in
+  *pod/web-7d9f8-x2k*ownerReferences*) echo "ReplicaSet/web-7d9f8/7d9f8" ;;
+  *) echo "unexpected: $*" >&2; exit 1 ;;
+esac
+SH
+: >| $out
+zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
+zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh"
+zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+drain 4
+zpty -w -n t "kubectl get -n ns pods web-7d9f8-x2k"$'\em'
+drain 4
+zpty -w -n t U
+drain 10
+zpty -w -n t R$'\x14'
+for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+zpty -d t
+if [[ $(<$out) == 'kubectl rollout restart -n ns deploy/web' ]]; then
+  print "ok   pod line, U then R: ${(q)$(<$out)}"
+else
+  print "FAIL pod line, U then R: got ${(q)$(<$out)}"; fail=1
+fi
 
 rm -rf $out $out.ran $kv $fake
 exit $fail

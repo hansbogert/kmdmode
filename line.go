@@ -100,8 +100,12 @@ func run(key string, toggle bool, words []string) ([]string, bool) {
 	if rewrite == nil {
 		return nil, false
 	}
+	res := rewrite()
+	if res == nil { // e.g. U on a pod with no owner
+		return nil, false
+	}
 	out := append([]string{}, words[:start]...)
-	out = append(out, rewrite()...)
+	out = append(out, res...)
 	return append(out, words[start+len(cmd):]...), true
 }
 

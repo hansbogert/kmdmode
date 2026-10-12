@@ -301,6 +301,13 @@ func kubectlMode(cmd []string) (mode, bool) {
 		}})
 	}
 	m.up = k.parent()
+	if pod, ok := singlePod(k); ok {
+		// Resolved on the keypress, so the menu itself never waits on the cluster.
+		m.actions = append(m.actions, action{"U", "owner", func() []string {
+			out, _ := k.owner(pod)
+			return out
+		}})
+	}
 	m.actions = append(m.actions, action{"O", "overview", k.overview})
 	for _, o := range kubectlOptions[k.sub] {
 		m.options = append(m.options, k.option(o))

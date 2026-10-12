@@ -92,6 +92,10 @@ _cmdmode_dispatch() {
   local -a words
   _cmdmode_words
   local out
+  if [[ -z $_cmdmode_options && $KEYS == [uU] ]]; then  # U asks the cluster: say so while it does
+    zle -M "cmdmode: asking the cluster for the pod's owner…"
+    zle -R
+  fi
   if out=$("$_cmdmode_bin" ${${_cmdmode_options:+toggle}:-apply} "$KEYS" -- "${words[@]}"); then
     if [[ $out == *= ]]; then
       # A line ending in "=" (S's --replicas=) waits for a value: hand the keyboard back.
