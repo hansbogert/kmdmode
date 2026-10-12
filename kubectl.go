@@ -303,10 +303,10 @@ func kubectlMode(cmd []string) (mode, bool) {
 	m.up = k.parent()
 	m.retype = k.retype
 	m.cluster = k.clusterFlags()
-	if pod, ok := singlePod(k); ok {
+	if ref, ok := singleResource(k); ok {
 		// Resolved on the keypress, so the menu itself never waits on the cluster.
 		m.actions = append(m.actions, action{"U", "owner", func() []string {
-			out, _ := k.owner(pod)
+			out, _ := k.owner(ref)
 			return out
 		}})
 	}

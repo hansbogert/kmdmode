@@ -314,7 +314,7 @@ done
 cat >| $fake/kubectl <<'SH'
 #!/bin/sh
 case "$*" in
-  *pod/web-7d9f8-x2k*ownerReferences*) echo "ReplicaSet/web-7d9f8/7d9f8" ;;
+  *web-7d9f8-x2k*ownerReferences*) echo "ReplicaSet|apps/v1|web-7d9f8|7d9f8" ;;
   *) echo "unexpected: $*" >&2; exit 1 ;;
 esac
 SH

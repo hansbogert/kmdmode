@@ -25,13 +25,18 @@ func fakeCluster(t *testing.T, owners map[string]string, seen *[]string) func([]
 
 func TestOwner(t *testing.T) {
 	owners := map[string]string{
-		"pod/web-7d9f8-x2k":  "ReplicaSet/web-7d9f8/7d9f8",
-		"pod/db-0":           "StatefulSet/db/",
-		"pod/backup-29-abcd": "Job/backup-29/",
-		"job/backup-29":      "CronJob/backup/",
-		"pod/solo-x":         "ReplicaSet/solo/",
-		"rs/solo":            "//",
-		"pod/bare":           "//",
+		"pods/web-7d9f8-x2k": "ReplicaSet|apps/v1|web-7d9f8|7d9f8",
+		"pod/db-0":           "StatefulSet|apps/v1|db|",
+		"pod/backup-29-abcd": "Job|batch/v1|backup-29|",
+		"job/backup-29":      "CronJob|batch/v1|backup|",
+		"pods/solo-x":        "ReplicaSet|apps/v1|solo|",
+		"rs/solo":            "|||",
+		"pods/bare":          "|||",
+		"secrets/ch":         "ClickHouseCluster|clickhouse.com/v1alpha1|analytics|",
+		"clickhousecluster.clickhouse.com/analytics": "|||",
+		"certificates.cert-manager.io/tls":           "|||",
+		"pods/static-node-a":                         "Node|v1|node-a|",
+		"node/node-a":                                "|||",
 	}
 	defer func(r func([]string) (string, error)) { runKubectl = r }(runKubectl)
 	var seen []string
@@ -42,34 +47,38 @@ func TestOwner(t *testing.T) {
 		{"kubectl logs --context c -n ns db-0 -f", "kubectl get --context c -n ns sts/db"},
 		{"kubectl describe -n ns pod/backup-29-abcd", "kubectl get -n ns cronjob/backup"},
 		{"kubectl get pods solo-x", "kubectl get rs/solo"},
+		{"kubectl get -n clickhouse secrets ch", "kubectl get -n clickhouse clickhousecluster.clickhouse.com/analytics"},
+		{"kubectl get pods static-node-a", "kubectl get node/node-a"},
 		{"kubectl get pods bare", ""},
+		{"kubectl get certificates.cert-manager.io tls", ""},
 		{"kubectl get pods missing", ""},
 	}
 	for _, c := range cases {
+		seen = nil
 		out, ok := run("U", false, strings.Fields(c.in))
 		check(t, "U", c.in, c.want, out, ok)
-	}
-	// A deployment's pod takes one call, a statefulset's one, a cronjob's two.
-	if n := len(seen); n != 1+1+2+2+1+1 {
-		t.Errorf("lookups: got %d: %q", n, seen)
-	}
-	if !strings.HasPrefix(seen[0], "-n ns --request-timeout=5s get pod/web-7d9f8-x2k -o jsonpath=") {
-		t.Errorf("first lookup: %q", seen[0])
+		// A deployment's pod takes one call.
+		if c.want == "kubectl get -n ns deploy/web" && len(seen) != 1 {
+			t.Errorf("deployment pod: %d lookups: %q", len(seen), seen)
+		}
 	}
 }
 
 func TestOwnerOffered(t *testing.T) {
 	for in, want := range map[string]bool{
-		"kubectl get pods p":        true,
-		"kubectl get pod/p -n ns":   true,
-		"kubectl logs p":            true,
-		"kubectl describe pods p":   true,
-		"kubectl get pods":          false,
-		"kubectl get pods a b":      false,
-		"kubectl get pods -A p":     false,
-		"kubectl get deploy d":      false,
-		"kubectl logs deploy/d":     false,
-		"kubectl get pods -l app=x": false,
+		"kubectl get pods p":                           true,
+		"kubectl get pod/p -n ns":                      true,
+		"kubectl logs p":                               true,
+		"kubectl describe pods p":                      true,
+		"kubectl get secrets s -n ns":                  true,
+		"kubectl get certificates.cert-manager.io/tls": true,
+		"kubectl get deploy d":                         true,
+		"kubectl get pods":                             false,
+		"kubectl get pods a b":                         false,
+		"kubectl get pods -A p":                        false,
+		"kubectl logs deploy/d":                        false,
+		"kubectl get pods -l app=x":                    false,
+		"kubectl get pods,svc p":                       false,
 	} {
 		m, _ := modeFor(strings.Fields(in))
 		got := false

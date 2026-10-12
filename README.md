@@ -86,12 +86,14 @@ accepts: restart and status for deployments, statefulsets and daemonsets, scale 
 statefulsets and replicasets. S leaves cmdmode with the cursor after
 `--replicas=`, so you type the count and Enter.
 
-**U** (owner) gets from a pod to what runs it, so R, S and T are in reach from the pods you
-browse: `kubectl get -n ns pods web-7d9f8-x2k` → U → `kubectl get -n ns deploy/web`. It asks the
-cluster on the keypress (the menu itself never does), following ownerReferences: pod → ReplicaSet
-→ Deployment, pod → Job → CronJob, or straight to a StatefulSet or DaemonSet. A Deployment is read
-off its ReplicaSet's name (`<deployment>-<pod-template-hash>`), so it takes one call. A bare pod has
-no owner.
+**U** (owner) goes from any single named resource to what owns it, e.g. from a pod to what runs
+it, so R, S and T are in reach from the pods you browse: `kubectl get -n ns pods web-7d9f8-x2k` → U
+→ `kubectl get -n ns deploy/web`. It asks the cluster on the keypress (the menu itself never
+does), following ownerReferences up: pod → ReplicaSet → Deployment, pod → Job → CronJob, a Secret
+→ the operator object that made it (`clickhousecluster.clickhouse.com/analytics`; kinds without a
+short name are written kind.group, which kubectl resolves for any CRD). A Deployment is read off
+its ReplicaSet's name (`<deployment>-<pod-template-hash>`), so a pod takes one call. Something you
+created yourself, like most Certificates, has no owner, and U says so.
 
 I is describe as in "inspect", leaving D for delete. **D is offered only when the line names
 specific resources** (`pods p`, `deploy/d`), never for a bare type, `-l`, `-A`, `--all` or `-f`,

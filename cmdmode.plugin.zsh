@@ -114,7 +114,7 @@ _cmdmode_dispatch() {
     return
   fi
   if [[ -z $_cmdmode_sub && $KEYS == [uU] ]]; then  # U asks the cluster: say so while it does
-    zle -M "cmdmode: asking the cluster for the pod's owner…"
+    zle -M "cmdmode: asking the cluster for the owner…"
     zle -R
   fi
   if out=$("$_cmdmode_bin" ${${_cmdmode_sub:+toggle}:-apply} "$KEYS" -- "${words[@]}"); then
@@ -130,6 +130,8 @@ _cmdmode_dispatch() {
     BUFFER=$out
     CURSOR=$#BUFFER
     _cmdmode_render "" quiet
+  elif [[ -z $_cmdmode_sub && $KEYS == [uU] ]]; then
+    _cmdmode_render "no owner found; "
   else
     _cmdmode_render "no '$KEYS' here; "
   fi
