@@ -130,6 +130,12 @@ func TestToggle(t *testing.T) {
 		{"e", "kubectl describe pod p", "kubectl describe pod p --show-events=false"},
 		{"f", "kubectl get pods", ""},
 		{"a", "kview kubectl get pods -A -o wide", "kview kubectl get pods -o wide"},
+		// -A on a named resource: kubectl refuses names across namespaces, so the names and -n go.
+		{"a", "kubectl get -n ns pods p -o wide", "kubectl get -o wide pods -A"},
+		{"a", "kubectl get -n ns deploy/d", "kubectl get deploy -A"},
+		{"a", "kubectl get -n ns pods a b --context c", "kubectl get --context c pods -A"},
+		{"a", "kview kubectl get -n ns pods p", "kview kubectl get pods -A"},
+		{"a", "kubectl get -n ns pods", "kubectl get -n ns pods -A"},
 		{"w", "kview kubectl get pods", "kview kubectl get pods -w"},
 		{"s", "kubectl get pods -A", "kubectl get pods -A --sort-by=.metadata.creationTimestamp"},
 		{"s", "kubectl get pods --sort-by=.metadata.creationTimestamp", "kubectl get pods"},

@@ -47,6 +47,7 @@ check 'kubectl -n ns ' OW 'kubectl get pods -A -o wide '
 check 'kubectl -n ns ' $'O\e' 'kubectl get pods -A -o wide' '[Esc] up'  # watching is a menu below
 check 'kubectl get -n ns pods p -o wide' ':c' 'kubectl get -n ns -o wide configmaps' 'cmdmode [kubectl get :]  [p] pods'
 check 'kubectl get -n ns pods p' $':\e' 'kubectl get -n ns pods p'  # Esc leaves the resource list
+check 'kubectl get -n ns pods p -o wide' '-a' 'kubectl get -o wide pods -A'  # -A drops names and -n
 check 'kubectl get deploy d -n ns' R 'kubectl rollout restart -n ns deploy/d' 'cmdmode [kubectl rollout]'
 check 'kubectl get deploy d -n ns ' S3 'kubectl scale -n ns deploy/d --replicas=3'  # S leaves cmdmode
 check 'kubectl get deploy d -n ns' $'R\e' 'kubectl get -n ns deploy/d' '[Esc] up'

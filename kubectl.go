@@ -312,7 +312,17 @@ func kubectlMode(cmd []string) (mode, bool) {
 	}
 	m.actions = append(m.actions, action{"O", "overview", k.overview})
 	for _, o := range kubectlOptions[k.sub] {
-		m.options = append(m.options, k.option(o))
+		opt := k.option(o)
+		if o.long == "--all-namespaces" && !opt.on && k.sub == "get" && len(k.pos) > 0 &&
+			(len(k.pos) > 1 || strings.Contains(k.pos[0], "/")) {
+			// kubectl can't get a named resource across all namespaces, and ignores -n with -A,
+			// so turning -A on lists the type everywhere instead.
+			opt.toggle = func() []string {
+				typ, _, _ := strings.Cut(k.pos[0], "/")
+				return append(k.without("--namespace").rebuild("get", typ), "-A")
+			}
+		}
+		m.options = append(m.options, opt)
 	}
 	return m, true
 }
