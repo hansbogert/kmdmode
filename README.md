@@ -19,7 +19,7 @@ cmdmode [kubectl logs -]  [f] -f*  [p] -p  [t] --timestamps  [c] --all-container
 A line you **run from cmdmode** (Enter) comes back in cmdmode once it ends, e.g. after
 `kubectl logs -f` on ctrl-c, so the next key carries on from it; Esc on that returned line clears
 it. On an **empty prompt**, Alt-m brings back the most recent command (of the last 20) that has a
-mode, so after `kubectl logs ...` ends you carry on from it. Keys are case-insensitive.
+mode, so after `kubectl logs ...` ends you carry on from it; Esc on it goes back to the empty prompt. Keys are case-insensitive.
 
 **Esc** steps back one level: out of the option list, then undoing actions and toggles one at a
 time (each back to that line and its menu), then out of cmdmode; the hint says `[Esc] back` or
@@ -68,13 +68,15 @@ The helper rewrites the last simple command that has an action, so env prefixes
 | `kubectl get`      | L logs, I describe, D delete, R restart, S scale, W watch, O overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels`, s sort by age |
 | `kubectl logs`     | G get, I describe, D delete, R restart, S scale, O overview | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
 | `kubectl describe` | L logs, G get, D delete, R restart, S scale, W watch, O overview | e `--show-events=false`                                |
-| `kubectl delete`   | L logs, G get, I describe, R restart, S scale, O overview |                                                        |
+| `kubectl delete`   | L logs, G get, I describe, R restart, S scale, O overview |
+| `kubectl rollout ...`, `kubectl scale ...` | G get, I describe, L logs, R restart, S scale, T status (minus its own), O overview | |                                                        |
 | any other `kubectl ...` | O overview                               |                                                        |
 | `kview kubectl ...` (after W or O) | W unwatch (drops kview)    | those of the kubectl command inside, kview kept        |
 
-**R** (`kubectl rollout restart`) and **S** (`kubectl scale ... --replicas=`) are offered for named
-workloads of a kind the command accepts: restart for deployments, statefulsets and daemonsets,
-scale for deployments, statefulsets and replicasets. S leaves cmdmode with the cursor after
+**R** (`kubectl rollout restart`), **S** (`kubectl scale ... --replicas=`) and **T** (`kubectl rollout
+status`, which follows a rollout until done) are offered for named workloads of a kind the command
+accepts: restart and status for deployments, statefulsets and daemonsets, scale for deployments,
+statefulsets and replicasets. S leaves cmdmode with the cursor after
 `--replicas=`, so you type the count and Enter.
 
 I is describe as in "inspect", leaving D for delete. **D is offered only when the line names

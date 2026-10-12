@@ -265,6 +265,20 @@ func kubectlMode(cmd []string) (mode, bool) {
 		if namesResources(k) {
 			m.actions = append(m.actions, workloadActions(k, k.pos)...)
 		}
+	case "rollout", "scale":
+		if refs, ok := k.workloads(); ok {
+			for _, v := range resourceVerbs[:2] { // get, describe; not delete from here
+				m.actions = append(m.actions, action{v.key, v.sub, func() []string {
+					return k.rebuild(v.sub, refs...)
+				}})
+			}
+			if len(refs) == 1 {
+				m.actions = append(m.actions, action{"L", "logs", func() []string {
+					return k.rebuild("logs", refs...)
+				}})
+			}
+			m.actions = append(m.actions, workloadActions(k, refs)...)
+		}
 	case "logs":
 		if args, ok := logsResource(k); ok {
 			for _, v := range resourceVerbs {
@@ -320,6 +334,7 @@ var workloadKinds = map[string]string{
 var (
 	restartable = set("deploy", "sts", "ds")
 	scalable    = set("deploy", "sts", "rs")
+	anyWorkload = set("deploy", "sts", "ds", "rs")
 )
 
 // workloadRefs turns named resources ("TYPE NAME..." or "TYPE/NAME") into TYPE/NAME refs, if all
@@ -332,13 +347,15 @@ func workloadRefs(pos []string, allowed map[string]bool) ([]string, bool) {
 	}
 	var refs []string
 	switch {
-	case len(pos) == 1:
-		typ, name, ok := strings.Cut(bare(pos[0]), "/")
-		kind, known := kindOf(typ)
-		if !ok || !known || name == "" {
-			return nil, false
+	case len(pos) >= 1 && strings.Contains(pos[0], "/"): // TYPE/NAME...
+		for _, p := range pos {
+			typ, name, ok := strings.Cut(bare(p), "/")
+			kind, known := kindOf(typ)
+			if !ok || !known || name == "" {
+				return nil, false
+			}
+			refs = append(refs, kind+"/"+name)
 		}
-		refs = []string{kind + "/" + name}
 	case len(pos) >= 2:
 		kind, known := kindOf(pos[0])
 		if !known {
@@ -353,21 +370,44 @@ func workloadRefs(pos []string, allowed map[string]bool) ([]string, bool) {
 	return refs, true
 }
 
-// workloadActions offers R (rollout restart) and S (scale) for named workloads. S ends the line
-// at "--replicas=", for the count to be typed.
+// workloadActions offers R (rollout restart), S (scale) and T (rollout status, which follows a
+// rollout until it is done) for named workloads, leaving out the one the line already is. S ends
+// the line at "--replicas=", for the count to be typed.
 func workloadActions(k kubectlCmd, pos []string) []action {
+	rolloutVerb := ""
+	if k.sub == "rollout" && len(k.pos) > 0 {
+		rolloutVerb = bare(k.pos[0])
+	}
 	var acts []action
-	if refs, ok := workloadRefs(pos, restartable); ok {
+	if refs, ok := workloadRefs(pos, restartable); ok && rolloutVerb != "restart" {
 		acts = append(acts, action{"R", "restart", func() []string {
 			return k.rebuild("rollout restart", refs...)
 		}})
 	}
-	if refs, ok := workloadRefs(pos, scalable); ok {
+	if refs, ok := workloadRefs(pos, scalable); ok && k.sub != "scale" {
 		acts = append(acts, action{"S", "scale", func() []string {
 			return append(k.rebuild("scale", refs...), "--replicas=")
 		}})
 	}
+	if refs, ok := workloadRefs(pos, restartable); ok && rolloutVerb != "status" {
+		acts = append(acts, action{"T", "status", func() []string {
+			return k.rebuild("rollout status", refs...)
+		}})
+	}
 	return acts
+}
+
+// workloads returns the TYPE/NAME refs a rollout or scale line names ("rollout VERB REF..." or
+// "scale REF...").
+func (k kubectlCmd) workloads() ([]string, bool) {
+	pos := k.pos
+	if k.sub == "rollout" {
+		if len(pos) == 0 {
+			return nil, false
+		}
+		pos = pos[1:]
+	}
+	return workloadRefs(pos, anyWorkload)
 }
 
 // Subcommands whose first argument is a resource type (or TYPE/NAME).
@@ -381,6 +421,8 @@ func (k kubectlCmd) overview() []string {
 	typ := "pods"
 	if typedSubs[k.sub] && len(k.pos) > 0 {
 		typ, _, _ = strings.Cut(k.pos[0], "/")
+	} else if refs, ok := k.workloads(); ok && (k.sub == "rollout" || k.sub == "scale") {
+		typ, _, _ = strings.Cut(refs[0], "/")
 	}
 	k.flags = slices.DeleteFunc(slices.Clone(k.flags), func(f kflag) bool {
 		_, global := kubectlFlagTables[""].value[f.long]

@@ -34,28 +34,32 @@ _cmdmode_render() {
     [[ $2 == quiet ]] || zle -M "cmdmode: no actions for this line"
     return 1
   fi
-  local name msg line
+  local name msg line has_options=
   for line in $lines; do
     f=("${(@ps:\t:)line}")
     case $f[1] in
       mode) name=$f[2] ;;
       action) [[ -z $_cmdmode_options ]] && msg+="  [$f[2]] $f[3]" ;;
-      option) [[ -n $_cmdmode_options ]] && msg+="  [$f[2]] $f[3]${${f[4]:#off}:+*}" ;;
+      option)
+        has_options=1
+        [[ -n $_cmdmode_options ]] && msg+="  [$f[2]] $f[3]${${f[4]:#off}:+*}" ;;
     esac
   done
-  local esc=exit
-  (( $#_cmdmode_undo )) && esc=back
+  local esc=exit tail
+  (( $#_cmdmode_undo )) || [[ -n $_cmdmode_returned && $BUFFER == "$_cmdmode_returned" ]] && esc=back
   if [[ -n $_cmdmode_options ]]; then
-    msg="${1}cmdmode [$name -]${msg}  [Esc] back"
+    msg="${1}cmdmode [$name -]${msg}" tail="  [Esc] back"
   else
-    msg="${1}cmdmode [$name]${msg}  [-] options  [Esc] $esc  [Enter] run"
+    msg="${1}cmdmode [$name]${msg}" tail="${has_options:+  [-] options}  [Esc] $esc  [Enter] run"
   fi
-  (( $#msg < COLUMNS )) || msg="${msg[1,COLUMNS-2]}…"
-  zle -M "$msg"
+  # When too wide, cut the list rather than the keys that always apply.
+  (( $#msg + $#tail < COLUMNS )) || msg="${msg[1,COLUMNS-$#tail-2]}…"
+  zle -M "$msg$tail"
 }
 
 # On an empty prompt, Alt-m starts from the most recent command in history that has a mode, so
-# after "kubectl logs ..." ends you can carry on from it. Looks back 20 commands at most.
+# after "kubectl logs ..." ends you can carry on from it. Looks back 20 commands at most. Esc on
+# the recalled line, untouched, goes back to the empty prompt.
 _cmdmode_recall() {
   local n
   local -a words
@@ -64,6 +68,7 @@ _cmdmode_recall() {
     _cmdmode_words
     if [[ -n $("$_cmdmode_bin" menu -- "${words[@]}") ]]; then
       CURSOR=$#BUFFER
+      _cmdmode_returned=$BUFFER  # so Esc on it, untouched, goes back to the empty prompt
       return
     fi
   done

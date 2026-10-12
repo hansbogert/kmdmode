@@ -34,7 +34,7 @@ check() {  # check LINE KEYS WANT [TEXT the terminal must show]
 
 check 'kubectl get pods -n ns pod1 ' L 'kubectl logs -n ns pod1 ' 'cmdmode [kubectl logs]  [G] get'
 check "kubectl get pod 'my pod' -o wide" l "kubectl logs 'my pod'"
-check 'kubectl get deploy d -n ns' I 'kubectl describe -n ns deploy d' 'cmdmode [kubectl get]  [I] describe  [D] delete'
+check 'kubectl get deploy d -n ns' I 'kubectl describe -n ns deploy d' 'cmdmode [kubectl get]  [I] describe'
 check 'kubectl get deploy d' L 'kubectl get deploy d' "no 'L' here"
 check 'kgp pod1' l 'kubectl logs pod1'
 check 'kubectl get pods p' $'\e'x 'kubectl get pods px'
@@ -173,6 +173,43 @@ if [[ $(<$out) == 'kubectl get -n ns pod p' ]]; then
 else
   print "FAIL empty prompt + Alt-m recall: got ${(q)$(<$out)}"; fail=1
 fi
+
+# The same recall after a rollout restart: its line has a real menu, so T follows the rollout.
+: >| $out
+zpty -b t "env -i HOME=$HOME TERM=xterm zsh -f -i"
+zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { :; }"
+zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+zpty -w t "kubectl rollout restart -n ns deploy/d"
+drain 10
+zpty -w -n t $'\em't$'\x14'
+for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+zpty -d t
+if [[ $(<$out) == 'kubectl rollout status -n ns deploy/d' ]]; then
+  print "ok   empty prompt + Alt-m after a rollout restart: T gives ${(q)$(<$out)}"
+else
+  print "FAIL Alt-m after rollout restart: got ${(q)$(<$out)}"; fail=1
+fi
+
+# Esc on a recalled line, untouched, goes back to the empty prompt; after an action, the first
+# Esc undoes it and the second clears the line.
+for keys in $'\e' $'g\e\e'; do
+  : >| $out
+  zpty -b t "env -i HOME=$HOME TERM=xterm zsh -f -i"
+  zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { :; }"
+  zpty -w t "_dump() { print -rn -- \"[\$BUFFER]\" >| $out }; zle -N _dump; bindkey '^T' _dump"
+  zpty -w t "kubectl rollout restart -n ns deploy/d"
+  drain 10
+  zpty -w -n t $'\em'$keys
+  drain 4
+  zpty -w -n t $'\x14'
+  for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+  zpty -d t
+  if [[ $(<$out) == '[]' ]]; then
+    print "ok   recalled line, ${(q)keys}: back to an empty prompt"
+  else
+    print "FAIL recalled line, ${(q)keys}: got ${(q)$(<$out)}, want []"; fail=1
+  fi
+done
 
 # A line run from cmdmode comes back in cmdmode: G then acts on it. Esc on that untouched
 # returned line clears it.
