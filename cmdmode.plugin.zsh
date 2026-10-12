@@ -1,12 +1,13 @@
 # cmdmode: press $CMDMODE_KEY (default Alt-m) to enter a modal keymap that rewrites the current
 # command line, e.g. "kubectl get pods -n ns pod1" then L gives "kubectl logs -n ns pod1".
-# The message line names the mode ("kubectl get"); "-" lists that mode's flags to toggle.
+# The message line names the mode ("kubectl get"); "-" lists that mode's flags to toggle, ":"
+# switches the resource type it lists.
 # The rewrite rules live in the Go helper; this file only owns the keymap and the buffer.
 
 typeset -g _cmdmode_bin=${CMDMODE_BIN:-${0:A:h}/bin/cmdmode}
 [[ -x $_cmdmode_bin ]] || _cmdmode_bin=cmdmode
 typeset -g _cmdmode_prev_keymap=main
-typeset -g _cmdmode_options=  # set while the "-" option list is shown
+typeset -g _cmdmode_sub=  # the submenu shown: "options" ("-"), "resources" (":"), or none
 
 # Fills $words from the buffer, expanding a leading alias so "kgp pod1" reads as kubectl.
 _cmdmode_words() {
@@ -16,7 +17,7 @@ _cmdmode_words() {
 
 _cmdmode_leave() {
   zle -K $_cmdmode_prev_keymap
-  _cmdmode_options=
+  _cmdmode_sub=
   zle -M ''
 }
 
@@ -33,25 +34,29 @@ _cmdmode_render() {
     [[ $2 == quiet ]] || zle -M "cmdmode: no actions for this line"
     return 1
   fi
-  local name msg line has_options= has_up=
+  local name msg line has_options= has_resources= has_up=
   for line in $lines; do
     f=("${(@ps:\t:)line}")
     case $f[1] in
       mode) name=$f[2] ;;
       up) has_up=1 ;;
-      action) [[ -z $_cmdmode_options ]] && msg+="  [$f[2]] $f[3]" ;;
+      action) [[ -z $_cmdmode_sub ]] && msg+="  [$f[2]] $f[3]" ;;
       option)
         has_options=1
-        [[ -n $_cmdmode_options ]] && msg+="  [$f[2]] $f[3]${${f[4]:#off}:+*}" ;;
+        [[ $_cmdmode_sub == options ]] && msg+="  [$f[2]] $f[3]${${f[4]:#off}:+*}" ;;
+      resource)
+        has_resources=1
+        [[ $_cmdmode_sub == resources ]] && msg+="  [$f[2]] $f[3]" ;;
     esac
   done
   local esc=exit tail
   [[ -n $has_up ]] && esc=up
-  if [[ -n $_cmdmode_options ]]; then
-    msg="${1}cmdmode [$name -]${msg}" tail="  [Esc] up"
-  else
-    msg="${1}cmdmode [$name]${msg}" tail="${has_options:+  [-] options}  [Esc] $esc  [Enter] run"
-  fi
+  case $_cmdmode_sub in
+    options) msg="${1}cmdmode [$name -]${msg}" tail="  [Esc] up" ;;
+    resources) msg="${1}cmdmode [$name :]${msg}" tail="  [Esc] up" ;;
+    *) msg="${1}cmdmode [$name]${msg}"
+       tail="${has_options:+  [-] options}${has_resources:+  [:] resource}  [Esc] $esc" ;;
+  esac
   # When too wide, cut the list rather than the keys that always apply.
   (( $#msg + $#tail < COLUMNS )) || msg="${msg[1,COLUMNS-$#tail-2]}…"
   zle -M "$msg$tail"
@@ -78,25 +83,41 @@ _cmdmode_recall() {
 _cmdmode_enter() {
   [[ -z ${BUFFER//[[:space:]]/} ]] && _cmdmode_recall
   _cmdmode_prev_keymap=$KEYMAP
-  _cmdmode_options=
+  _cmdmode_sub=
   zle -K cmdmode
   _cmdmode_render
 }
 
 _cmdmode_dispatch() {
-  if [[ -z $_cmdmode_options && $KEYS == - ]]; then
-    _cmdmode_options=1
+  if [[ -z $_cmdmode_sub && $KEYS == [-:] ]]; then
+    [[ $KEYS == - ]] && _cmdmode_sub=options || _cmdmode_sub=resources
     _cmdmode_render
     return
   fi
   local -a words
   _cmdmode_words
-  local out
-  if [[ -z $_cmdmode_options && $KEYS == [uU] ]]; then  # U asks the cluster: say so while it does
+  local out typ
+  if [[ $_cmdmode_sub == resources ]]; then
+    typ=$KEYS
+    if [[ $KEYS == . ]]; then
+      _cmdmode_pick_resource || { _cmdmode_render; return }
+      typ=$REPLY
+    fi
+    if out=$("$_cmdmode_bin" retype "$typ" -- "${words[@]}"); then
+      _cmdmode_sub=
+      BUFFER=$out
+      CURSOR=$#BUFFER
+      _cmdmode_render "" quiet
+    else
+      _cmdmode_render "no '$KEYS' here; "
+    fi
+    return
+  fi
+  if [[ -z $_cmdmode_sub && $KEYS == [uU] ]]; then  # U asks the cluster: say so while it does
     zle -M "cmdmode: asking the cluster for the pod's owner…"
     zle -R
   fi
-  if out=$("$_cmdmode_bin" ${${_cmdmode_options:+toggle}:-apply} "$KEYS" -- "${words[@]}"); then
+  if out=$("$_cmdmode_bin" ${${_cmdmode_sub:+toggle}:-apply} "$KEYS" -- "${words[@]}"); then
     if [[ $out == *= ]]; then
       # A line ending in "=" (S's --replicas=) waits for a value: hand the keyboard back.
       BUFFER=$out
@@ -114,15 +135,31 @@ _cmdmode_dispatch() {
   fi
 }
 
-# Esc goes up one menu: out of the option list (toggles kept), then from an action's menu (logs,
-# rollout, scale, describe, delete) to the get menu of the resource it acts on, then, at a top
-# menu, out of cmdmode.
+# ":" then "." offers every resource type the line's cluster serves (built-ins and the CRDs the
+# apiextensions API registered) in fzf, below the prompt; sets REPLY to the chosen one. Called
+# directly, not in $(...): it redraws through zle, which a subshell can't.
+_cmdmode_pick_resource() {
+  local fzf=${_cmdmode_bin:h}/fzf types typ
+  [[ -x $fzf ]] || fzf=fzf
+  zle -M "cmdmode: asking the cluster for its resource types…"
+  zle -R
+  types=$("$_cmdmode_bin" api-resources -- "${words[@]}") || return 1
+  typ=$(print -r -- $types | $fzf --height=40% --layout=reverse --prompt="resource > " \
+    --header="enter: list it  esc: cancel")
+  zle reset-prompt
+  REPLY=$typ
+  [[ -n $typ ]]
+}
+
+# Esc goes up one menu: out of the option or resource list (toggles kept), then from an action's
+# menu (logs, rollout, scale, describe, delete) to the get menu of the resource it acts on, then,
+# at a top menu, out of cmdmode.
 _cmdmode_escape() {
   local -a words
   local parent
   _cmdmode_words
-  if [[ -n $_cmdmode_options ]]; then
-    _cmdmode_options=
+  if [[ -n $_cmdmode_sub ]]; then
+    _cmdmode_sub=
     _cmdmode_render
   elif parent=$("$_cmdmode_bin" up -- "${words[@]}"); then
     BUFFER=$parent

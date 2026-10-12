@@ -9,6 +9,8 @@
 //	cmdmode apply KEY -- WORD...   print the line after action KEY; exit 1 if it does not apply
 //	cmdmode toggle KEY -- WORD...  print the line after toggling option KEY; exit 1 likewise
 //	cmdmode up -- WORD...          print the line of the parent menu; exit 1 at a top menu
+//	cmdmode retype TYPE|KEY -- WORD...  print the line listing another resource type (":" menu)
+//	cmdmode api-resources -- WORD...    print every listable resource type of the line's cluster
 //	cmdmode pick -- WORD...        print a command for the row on stdin, picked from WORD's output
 //	cmdmode select -- WORD...      like pick, for stdin's row then label lines: a get by selector
 //	cmdmode faults                 filter the kubectl table on stdin to its unhealthy rows
@@ -41,6 +43,12 @@ func main() {
 		if m.up != nil {
 			fmt.Println("up")
 		}
+		if m.retype != nil {
+			for _, r := range resourceKeys {
+				fmt.Printf("resource\t%s\t%s\n", r.key, r.name)
+			}
+			fmt.Printf("resource\t.\tany…\n")
+		}
 	case len(args) >= 3 && (args[0] == "apply" || args[0] == "toggle") && args[2] == "--":
 		out, ok := run(args[1], args[0] == "toggle", args[3:])
 		if !ok {
@@ -53,6 +61,25 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Println(strings.Join(out, " "))
+	case len(args) >= 3 && args[0] == "retype" && args[2] == "--":
+		out, ok := retype(args[1], args[3:])
+		if !ok {
+			os.Exit(1)
+		}
+		fmt.Println(strings.Join(out, " "))
+	case len(args) >= 2 && args[0] == "api-resources" && args[1] == "--":
+		m, ok := modeFor(args[2:])
+		if !ok {
+			os.Exit(1)
+		}
+		// Discovery lists built-ins and every CRD the apiextensions API has registered; -o name
+		// qualifies the latter (certificates.cert-manager.io).
+		out, err := runKubectl(append(m.cluster, "--request-timeout=10s", "api-resources", "--verbs=list", "-o", "name"))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Print(out)
 	case len(args) >= 2 && args[0] == "pick" && args[1] == "--":
 		row, _ := io.ReadAll(os.Stdin)
 		out, ok := kubectlPick(args[2:], string(row))
@@ -88,7 +115,7 @@ func main() {
 			os.Exit(1)
 		}
 	default:
-		fmt.Fprintln(os.Stderr, "usage: cmdmode menu|up|pick|select -- WORD... | cmdmode apply|toggle KEY -- WORD... | cmdmode faults | cmdmode columns [--list] COL,...")
+		fmt.Fprintln(os.Stderr, "usage: cmdmode menu|up|api-resources|pick|select -- WORD... | cmdmode retype TYPE -- WORD... | cmdmode apply|toggle KEY -- WORD... | cmdmode faults | cmdmode columns [--list] COL,...")
 		os.Exit(2)
 	}
 }

@@ -6,7 +6,7 @@ Type `kubectl get pods -n ns pod1`, press **Alt-m**, and the message line names 
 keys:
 
 ```
-cmdmode [kubectl get]  [L] logs  [D] describe  [-] options  [Esc] exit  [Enter] run
+cmdmode [kubectl get]  [L] logs  [I] describe  [-] options  [:] resource  [Esc] exit
 ```
 
 Press **H** and the line becomes `kubectl logs -n ns pod1`; the mode follows the line, so you are
@@ -21,11 +21,17 @@ A line you **run from cmdmode** (Enter) comes back in cmdmode once it ends, e.g.
 it. On an **empty prompt**, Alt-m brings back the most recent command (of the last 20) that has a
 mode, so after `kubectl logs ...` ends you carry on from it; Esc on it goes back to the empty prompt. Keys are case-insensitive.
 
+**`:`** switches the resource type the line lists, keeping where it looks (context, `-n`/`-A`,
+`-o`; names and selectors belong to the old type): `[p] pods  [s] statefulsets  [c] configmaps
+[e] secrets  [d] daemonsets`, or `[.] any…`, an fzf picker below the prompt over every listable type
+the line's cluster serves (`kubectl api-resources`, so built-ins and every CRD the apiextensions API
+registered, qualified like `certificates.cert-manager.io`). On a `kview` line it stays watched.
+
 **Esc** goes up one menu: out of the option list (toggles kept), then from an action's menu
 (`logs`, `rollout`, `scale`, `describe`, `delete`) to the get menu of the resource it acts on,
 e.g. `kubectl rollout restart -n ns deploy/d` up to `kubectl get -n ns deploy/d`, and from a
 `kview ...` line (after W or O) to the plain command it watches, then, at a top menu, out of
-cmdmode. The hint says `[Esc] up` or `[Esc] exit`. **Enter** runs the line.
+cmdmode. The hint says `[Esc] up` or `[Esc] exit`. **Enter** runs the line (in every menu, so the hint leaves it out).
 
 ## Install
 

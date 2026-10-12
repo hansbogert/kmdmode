@@ -60,12 +60,7 @@ func (k kubectlCmd) owner(pod string) ([]string, bool) {
 	// Only the cluster and identity flags apply to the lookups and the result.
 	notGlobal := func(f kflag) bool { _, _, known := lookup("", f.long); return !known }
 	k.flags = slices.DeleteFunc(slices.Clone(k.flags), notGlobal)
-	var flags []string // unquoted, for exec
-	for _, f := range k.flags {
-		for _, w := range k.words[f.start:f.end] {
-			flags = append(flags, bare(w))
-		}
-	}
+	flags := k.clusterFlags()
 	ref, found := "pod/"+pod, false
 	for range 3 {
 		args := append(append([]string{}, flags...), "--request-timeout=5s", "get", ref, "-o",

@@ -301,6 +301,8 @@ func kubectlMode(cmd []string) (mode, bool) {
 		}})
 	}
 	m.up = k.parent()
+	m.retype = k.retype
+	m.cluster = k.clusterFlags()
 	if pod, ok := singlePod(k); ok {
 		// Resolved on the keypress, so the menu itself never waits on the cluster.
 		m.actions = append(m.actions, action{"U", "owner", func() []string {
@@ -313,6 +315,34 @@ func kubectlMode(cmd []string) (mode, bool) {
 		m.options = append(m.options, k.option(o))
 	}
 	return m, true
+}
+
+// The built-in resource types the ":" menu offers, by key ("." picks any type the cluster serves).
+var resourceKeys = []struct{ key, name string }{
+	{"p", "pods"}, {"s", "statefulsets"}, {"c", "configmaps"}, {"e", "secrets"}, {"d", "daemonsets"},
+}
+
+// retype lists another resource type where the line looks: the cluster flags, -n or -A, and -o
+// carry over; names, selectors and the rest belong to the old type.
+func (k kubectlCmd) retype(typ string) []string {
+	k.flags = slices.DeleteFunc(slices.Clone(k.flags), func(f kflag) bool {
+		_, _, global := lookup("", f.long)
+		return !global && f.long != "--all-namespaces" && f.long != "--output"
+	})
+	return k.rebuild("get", typ)
+}
+
+// clusterFlags returns the line's global flags (cluster, identity, namespace), unquoted for exec.
+func (k kubectlCmd) clusterFlags() []string {
+	var flags []string
+	for _, f := range k.flags {
+		if _, _, global := lookup("", f.long); global {
+			for _, w := range k.words[f.start:f.end] {
+				flags = append(flags, bare(w))
+			}
+		}
+	}
+	return flags
 }
 
 // parent is the menu above the line's: the get of the resource that a describe, delete, logs,

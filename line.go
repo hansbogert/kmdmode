@@ -13,6 +13,9 @@ type mode struct {
 	actions []action
 	options []option
 	up      func() []string // the parent menu's line, or nil at a top menu
+	// retype lists another resource type where the line looks (":"), nil if it can't.
+	retype  func(typ string) []string
+	cluster []string // the line's cluster and identity flags, unquoted, for asking the cluster
 }
 
 type action struct {
@@ -50,6 +53,10 @@ func kviewMode(prefix, cmd []string) (mode, bool) {
 	m := mode{name: "kview " + inner.name}
 	m.actions = []action{{"W", "unwatch", func() []string { return cmd }}}
 	m.up = func() []string { return cmd }
+	m.cluster = inner.cluster
+	if inner.retype != nil { // stays watched; -c goes, as columns differ per type
+		m.retype = func(typ string) []string { return append([]string{"kview"}, inner.retype(typ)...) }
+	}
 	for _, o := range inner.options {
 		toggle := o.toggle
 		o.toggle = func() []string { return append(slices.Clone(prefix), toggle()...) }
@@ -61,12 +68,41 @@ func kviewMode(prefix, cmd []string) (mode, bool) {
 // up returns the line of the target command's parent menu (e.g. a rollout line's get), spliced
 // into the full line like run's result.
 func up(words []string) ([]string, bool) {
+	return spliceTarget(words, func(m mode) []string {
+		if m.up == nil {
+			return nil
+		}
+		return m.up()
+	})
+}
+
+// retype rewrites the target command to list typ, or the built-in type keyed typ (":" menu).
+func retype(typ string, words []string) ([]string, bool) {
+	for _, r := range resourceKeys {
+		if strings.EqualFold(r.key, typ) {
+			typ = r.name
+		}
+	}
+	return spliceTarget(words, func(m mode) []string {
+		if m.retype == nil {
+			return nil
+		}
+		return m.retype(typ)
+	})
+}
+
+// spliceTarget replaces the target command with what rewrite makes of its mode, if anything.
+func spliceTarget(words []string, rewrite func(mode) []string) ([]string, bool) {
 	start, cmd, m, ok := target(words)
-	if !ok || m.up == nil {
+	if !ok {
+		return nil, false
+	}
+	res := rewrite(m)
+	if res == nil {
 		return nil, false
 	}
 	out := append([]string{}, words[:start]...)
-	out = append(out, m.up()...)
+	out = append(out, res...)
 	return append(out, words[start+len(cmd):]...), true
 }
 

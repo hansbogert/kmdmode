@@ -45,6 +45,8 @@ check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kubectl]
 check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kview kubectl get]  [W] unwatch'
 check 'kubectl -n ns ' OW 'kubectl get pods -A -o wide '
 check 'kubectl -n ns ' $'O\e' 'kubectl get pods -A -o wide' '[Esc] up'  # watching is a menu below
+check 'kubectl get -n ns pods p -o wide' ':c' 'kubectl get -n ns -o wide configmaps' 'cmdmode [kubectl get :]  [p] pods'
+check 'kubectl get -n ns pods p' $':\e' 'kubectl get -n ns pods p'  # Esc leaves the resource list
 check 'kubectl get deploy d -n ns' R 'kubectl rollout restart -n ns deploy/d' 'cmdmode [kubectl rollout]'
 check 'kubectl get deploy d -n ns ' S3 'kubectl scale -n ns deploy/d --replicas=3'  # S leaves cmdmode
 check 'kubectl get deploy d -n ns' $'R\e' 'kubectl get -n ns deploy/d' '[Esc] up'
@@ -73,10 +75,16 @@ cp $fake/kubectl $fake/kubecolor
 chmod +x $fake/kubectl $fake/kubecolor
 
 # Waits $1 twentieths of a second while reading the pty: fzf redraws constantly, and a pty
-# nobody reads fills up and blocks it.
+# nobody reads fills up and blocks it. Answers a cursor-position query (fzf --height asks) as a
+# terminal would.
 drain() {
   local chunk
-  repeat $1 { while zpty -rt t chunk; do :; done; sleep 0.05 }
+  repeat $1 {
+    while zpty -rt t chunk; do
+      [[ $chunk == *$'\e[6n'* ]] && zpty -w -n t $'\e[5;1R'
+    done
+    sleep 0.05
+  }
 }
 
 check_pick() {  # check_pick KEYS WANT [KEY pressed on the returned prompt]
@@ -326,6 +334,37 @@ if [[ $(<$out) == 'kubectl rollout restart -n ns deploy/web' ]]; then
   print "ok   pod line, U then R: ${(q)$(<$out)}"
 else
   print "FAIL pod line, U then R: got ${(q)$(<$out)}"; fail=1
+fi
+
+# ":" then "." lists the cluster's resource types (a fake cluster here) in fzf below the prompt;
+# typing "cert" and Enter switches the line to that CRD.
+cat >| $fake/kubectl <<'SH'
+#!/bin/sh
+case "$*" in
+  *api-resources*) printf 'pods\nconfigmaps\ncertificates.cert-manager.io\nissuers.cert-manager.io\n' ;;
+  *) echo "unexpected: $*" >&2; exit 1 ;;
+esac
+SH
+: >| $out
+zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
+zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
+zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+drain 4
+zpty -w -n t "kubectl get -n ns pods"$'\em'
+drain 4
+zpty -w -n t ':.'
+drain 20
+zpty -w -n t cert
+drain 10  # let fzf filter before Enter, as a person typing would
+zpty -w -n t $'\r'
+drain 10
+zpty -w -n t $'\x14'
+for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+zpty -d t
+if [[ $(<$out) == 'kubectl get -n ns certificates.cert-manager.io' ]]; then
+  print "ok   :. picker, cert + Enter: ${(q)$(<$out)}"
+else
+  print "FAIL :. picker: got ${(q)$(<$out)}"; fail=1
 fi
 
 rm -rf $out $out.ran $kv $fake
