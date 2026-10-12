@@ -319,7 +319,8 @@ func kubectlMode(cmd []string) (mode, bool) {
 
 // The built-in resource types the ":" menu offers, by key ("." picks any type the cluster serves).
 var resourceKeys = []struct{ key, name string }{
-	{"p", "pods"}, {"s", "statefulsets"}, {"c", "configmaps"}, {"e", "secrets"}, {"d", "daemonsets"},
+	{"p", "pods"}, {"d", "deployments"}, {"s", "statefulsets"}, {"a", "daemonsets"},
+	{"c", "configmaps"}, {"e", "secrets"},
 }
 
 // retype lists another resource type where the line looks: the cluster flags, -n or -A, and -o

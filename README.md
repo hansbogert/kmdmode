@@ -22,8 +22,8 @@ it. On an **empty prompt**, Alt-m brings back the most recent command (of the la
 mode, so after `kubectl logs ...` ends you carry on from it; Esc on it goes back to the empty prompt. Keys are case-insensitive.
 
 **`:`** switches the resource type the line lists, keeping where it looks (context, `-n`/`-A`,
-`-o`; names and selectors belong to the old type): `[p] pods  [s] statefulsets  [c] configmaps
-[e] secrets  [d] daemonsets`, or `[.] any…`, an fzf picker below the prompt over every listable type
+`-o`; names and selectors belong to the old type): `[p] pods  [d] deployments  [s] statefulsets
+[a] daemonsets  [c] configmaps  [e] secrets`, or `[.] any…`, an fzf picker below the prompt over every listable type
 the line's cluster serves (`kubectl api-resources`, so built-ins and every CRD the apiextensions API
 registered, qualified like `certificates.cert-manager.io`). On a `kview` line it stays watched.
 
