@@ -248,7 +248,8 @@ func TestUp(t *testing.T) {
 		{"kubectl get -n ns deploy d", ""},
 		{"kubectl get pods", ""},
 		{"kubectl describe pods -l app=x", ""},
-		{"kview kubectl get pods -A -o wide", ""},
+		{"kview kubectl get pods -A -o wide", "kubectl get pods -A -o wide"},
+		{"kview -c STATUS,NODE kubectl describe pod p", "kubectl describe pod p"},
 		{"ls", ""},
 	}
 	for _, c := range cases {

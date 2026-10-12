@@ -39,8 +39,8 @@ func commandMode(cmd []string) (mode, bool) {
 }
 
 // kviewMode is the mode of "kview [-c COLS] CMD", as W, O and kview itself write it: Enter runs
-// it, the options toggle CMD's flags with the kview prefix kept in front, and W takes the prefix
-// off again. CMD's actions are left out, since they would rewrite the line into things like
+// it, the options toggle CMD's flags with the kview prefix kept in front, and W, like Esc (it is a
+// menu below CMD's), takes the prefix off again. CMD's actions are left out, since they would rewrite the line into things like
 // "kview kubectl logs".
 func kviewMode(prefix, cmd []string) (mode, bool) {
 	inner, ok := kubectlMode(cmd)
@@ -49,6 +49,7 @@ func kviewMode(prefix, cmd []string) (mode, bool) {
 	}
 	m := mode{name: "kview " + inner.name}
 	m.actions = []action{{"W", "unwatch", func() []string { return cmd }}}
+	m.up = func() []string { return cmd }
 	for _, o := range inner.options {
 		toggle := o.toggle
 		o.toggle = func() []string { return append(slices.Clone(prefix), toggle()...) }

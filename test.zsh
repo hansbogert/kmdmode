@@ -44,6 +44,7 @@ check 'kubectl logs -f p' '-f'$'\e''g' 'kubectl get pod p' 'cmdmode [kubectl log
 check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kubectl]  [O] overview'
 check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kview kubectl get]  [W] unwatch'
 check 'kubectl -n ns ' OW 'kubectl get pods -A -o wide '
+check 'kubectl -n ns ' $'O\e' 'kubectl get pods -A -o wide' '[Esc] up'  # watching is a menu below
 check 'kubectl get deploy d -n ns' R 'kubectl rollout restart -n ns deploy/d' 'cmdmode [kubectl rollout]'
 check 'kubectl get deploy d -n ns ' S3 'kubectl scale -n ns deploy/d --replicas=3'  # S leaves cmdmode
 check 'kubectl get deploy d -n ns' $'R\e' 'kubectl get -n ns deploy/d' '[Esc] up'

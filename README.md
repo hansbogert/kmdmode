@@ -23,8 +23,9 @@ mode, so after `kubectl logs ...` ends you carry on from it; Esc on it goes back
 
 **Esc** goes up one menu: out of the option list (toggles kept), then from an action's menu
 (`logs`, `rollout`, `scale`, `describe`, `delete`) to the get menu of the resource it acts on,
-e.g. `kubectl rollout restart -n ns deploy/d` up to `kubectl get -n ns deploy/d`, then, at a top
-menu, out of cmdmode. The hint says `[Esc] up` or `[Esc] exit`. **Enter** runs the line.
+e.g. `kubectl rollout restart -n ns deploy/d` up to `kubectl get -n ns deploy/d`, and from a
+`kview ...` line (after W or O) to the plain command it watches, then, at a top menu, out of
+cmdmode. The hint says `[Esc] up` or `[Esc] exit`. **Enter** runs the line.
 
 ## Install
 
