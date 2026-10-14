@@ -30,8 +30,11 @@ _cmdmode_render() {
   _cmdmode_words
   lines=(${(f)"$("$_cmdmode_bin" menu -- "${words[@]}")"})
   if (( ! $#lines )); then
-    _cmdmode_leave
-    [[ $2 == quiet ]] || zle -M "cmdmode: no actions for this line"
+    # One message only: clearing it (as _cmdmode_leave does) and then setting it again in the
+    # same keypress shifts the prompt up a row on screen.
+    zle -K $_cmdmode_prev_keymap
+    _cmdmode_sub=
+    [[ $2 == quiet ]] && zle -M '' || zle -M "cmdmode: no actions for this line"
     return 1
   fi
   local name msg line has_options= has_resources= has_up=
