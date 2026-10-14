@@ -446,5 +446,27 @@ for keys want in $'\r' 'kubectl --context mgmt get -n ns pods' $'\e' 'kubectl ge
   fi
 done
 
+# Enter on a delete line asks first: capital Y runs it, y (or anything else) cancels and stays.
+for keys ran in Y 'delete -n ns pods p' y ''; do
+  rm -f $out.ran
+  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
+  zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { print -rn -- \"\$*\" >| $out.ran }"
+  drain 4
+  zpty -w -n t "kubectl get -n ns pods p"$'\em'
+  drain 4
+  local screen= asked= chunk
+  zpty -w -n t $'D\r'
+  repeat 6 { while zpty -rt t chunk; do asked+=$chunk; done; sleep 0.05 }
+  zpty -w -n t $keys
+  repeat 10 { while zpty -rt t chunk; do screen+=$chunk; done; sleep 0.05 }
+  zpty -d t
+  got=; [[ -e $out.ran ]] && got=$(<$out.ran)
+  if [[ $asked == *"press Y (capital)"* && $got == "$ran" && ( -n $ran || $screen == *"not deleted"* ) ]]; then
+    print "ok   delete confirm ${keys}: ran ${(q)got}"
+  else
+    print "FAIL delete confirm ${keys}: ran ${(q)got}, want ${(q)ran}"; fail=1
+  fi
+done
+
 rm -rf $out $out.ran $kv $fake
 exit $fail

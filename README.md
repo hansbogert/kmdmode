@@ -111,8 +111,9 @@ created yourself, like most Certificates, has no owner, and U says so.
 I is describe as in "inspect", leaving D for delete. **D is offered only when the line names
 specific resources** (`pods p`, `deploy/d`), never for a bare type, `-l`, `-A`, `--all` or `-f`,
 where it would delete everything that matches; from `logs`, only for a plain pod name, since
-`logs deploy/d` reads one pod and deleting the deployment is a bigger step. Like every action, D
-only rewrites the line: nothing runs until you press Enter. H is offered for exactly one pod, or
+`logs deploy/d` reads one pod and deleting the deployment is a bigger step. D only rewrites the line, and
+Enter on a delete line asks first: it runs only on a capital **Y**; any other key, lowercase `y`
+included, cancels and stays in cmdmode. H is offered for exactly one pod, or
 pods picked by `-l`.
 
 **O overview** is in every kubectl mode: a k9s-style live list of the line's resource type across

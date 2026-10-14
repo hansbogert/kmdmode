@@ -224,8 +224,21 @@ _cmdmode_escape() {
 }
 
 # A line run from cmdmode comes back in cmdmode once it ends (after logs -f, on ctrl-c), so you
-# carry on from it.
+# carry on from it. A delete runs only after a capital Y: D then Enter is too quick a slip.
 _cmdmode_run() {
+  local -a words
+  _cmdmode_words
+  local -a lines=(${(f)"$("$_cmdmode_bin" menu -- "${words[@]}")"})
+  if [[ $lines[1] == $'mode\tkubectl delete' ]]; then
+    local key
+    zle -M "cmdmode: delete? press Y (capital) to run it, any other key cancels"
+    zle -R
+    read -k 1 key
+    if [[ $key != Y ]]; then
+      _cmdmode_render "not deleted; "
+      return
+    fi
+  fi
   _cmdmode_rerun=$BUFFER
   _cmdmode_leave
   zle accept-line
