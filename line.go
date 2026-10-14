@@ -16,6 +16,9 @@ type mode struct {
 	// retype lists another resource type where the line looks (":"), nil if it can't.
 	retype  func(typ string) []string
 	cluster []string // the line's cluster and identity flags, unquoted, for asking the cluster
+	// context sets the line's --context (C); currentContext is the one it names, if any.
+	context        func(name string) []string
+	currentContext string
 }
 
 type action struct {
@@ -54,6 +57,8 @@ func kviewMode(prefix, cmd []string) (mode, bool) {
 	m.actions = []action{{"W", "unwatch", func() []string { return cmd }}}
 	m.up = func() []string { return cmd }
 	m.cluster = inner.cluster
+	m.currentContext = inner.currentContext
+	m.context = func(name string) []string { return append(slices.Clone(prefix), inner.context(name)...) }
 	if inner.retype != nil { // stays watched; -c goes, as columns differ per type
 		m.retype = func(typ string) []string { return append([]string{"kview"}, inner.retype(typ)...) }
 	}
@@ -88,6 +93,16 @@ func retype(typ string, words []string) ([]string, bool) {
 			return nil
 		}
 		return m.retype(typ)
+	})
+}
+
+// setContext rewrites the target command to use kubeconfig context name (C).
+func setContext(name string, words []string) ([]string, bool) {
+	return spliceTarget(words, func(m mode) []string {
+		if m.context == nil {
+			return nil
+		}
+		return m.context(name)
 	})
 }
 

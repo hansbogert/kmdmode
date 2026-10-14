@@ -11,6 +11,8 @@
 //	cmdmode up -- WORD...          print the line of the parent menu; exit 1 at a top menu
 //	cmdmode retype TYPE|KEY -- WORD...  print the line listing another resource type (":" menu)
 //	cmdmode api-resources -- WORD...    print every listable resource type of the line's cluster
+//	cmdmode contexts -- WORD...    print the context the line uses, then every kubeconfig context
+//	cmdmode context NAME -- WORD...  print the line using context NAME (C)
 //	cmdmode pick -- WORD...        print a command for the row on stdin, picked from WORD's output
 //	cmdmode select -- WORD...      like pick, for stdin's row then label lines: a get by selector
 //	cmdmode faults                 filter the kubectl table on stdin to its unhealthy rows
@@ -42,6 +44,9 @@ func main() {
 		}
 		if m.up != nil {
 			fmt.Println("up")
+		}
+		if m.context != nil { // C, case-sensitive: the zsh side runs the picker
+			fmt.Println("action\tC\tcontext")
 		}
 		if m.retype != nil {
 			for _, r := range resourceKeys {
@@ -80,6 +85,29 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Print(out)
+	case len(args) >= 3 && args[0] == "context" && args[2] == "--":
+		out, ok := setContext(args[1], args[3:])
+		if !ok {
+			os.Exit(1)
+		}
+		fmt.Println(strings.Join(out, " "))
+	case len(args) >= 2 && args[0] == "contexts" && args[1] == "--":
+		m, ok := modeFor(args[2:])
+		if !ok {
+			os.Exit(1)
+		}
+		current := m.currentContext
+		if current == "" {
+			out, _ := runKubectl(append(m.cluster, "config", "current-context"))
+			current = strings.TrimSpace(out)
+		}
+		names, err := runKubectl(append(m.cluster, "config", "get-contexts", "-o", "name"))
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Println(current)
+		fmt.Print(names)
 	case len(args) >= 2 && args[0] == "pick" && args[1] == "--":
 		row, _ := io.ReadAll(os.Stdin)
 		out, ok := kubectlPick(args[2:], string(row))
@@ -115,7 +143,7 @@ func main() {
 			os.Exit(1)
 		}
 	default:
-		fmt.Fprintln(os.Stderr, "usage: cmdmode menu|up|api-resources|pick|select -- WORD... | cmdmode retype TYPE -- WORD... | cmdmode apply|toggle KEY -- WORD... | cmdmode faults | cmdmode columns [--list] COL,...")
+		fmt.Fprintln(os.Stderr, "usage: cmdmode menu|up|api-resources|contexts|pick|select -- WORD... | cmdmode retype TYPE|context NAME -- WORD... | cmdmode apply|toggle KEY -- WORD... | cmdmode faults | cmdmode columns [--list] COL,...")
 		os.Exit(2)
 	}
 }

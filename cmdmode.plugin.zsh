@@ -94,6 +94,18 @@ _cmdmode_enter() {
 }
 
 _cmdmode_dispatch() {
+  if [[ -z $_cmdmode_sub && $KEYS == C ]]; then  # case-sensitive: lowercase c is not context
+    local -a words
+    _cmdmode_words
+    local out
+    _cmdmode_pick_context || { _cmdmode_render; return }
+    if out=$("$_cmdmode_bin" context "$REPLY" -- "${words[@]}"); then
+      BUFFER=$out
+      CURSOR=$#BUFFER
+    fi
+    _cmdmode_render "" quiet
+    return
+  fi
   if [[ -z $_cmdmode_sub && $KEYS == [-:] ]]; then
     [[ $KEYS == - ]] && _cmdmode_sub=options || _cmdmode_sub=resources
     _cmdmode_render
@@ -156,6 +168,20 @@ _cmdmode_pick_resource() {
   zle reset-prompt
   REPLY=$typ
   [[ -n $typ ]]
+}
+
+# C offers the kubeconfig's contexts in fzf below the prompt, headed by the one the line uses now;
+# sets REPLY to the chosen one. Only the line changes, not the kubeconfig's current context.
+_cmdmode_pick_context() {
+  local fzf=${_cmdmode_bin:h}/fzf ctx
+  local -a lines
+  [[ -x $fzf ]] || fzf=fzf
+  lines=(${(f)"$("$_cmdmode_bin" contexts -- "${words[@]}")"}) || return 1
+  ctx=$(print -rl -- ${lines[2,-1]} | $fzf --height=40% --layout=reverse --prompt="context > " \
+    --header="now: ${lines[1]:-?}  enter: use it  esc: cancel")
+  zle reset-prompt
+  REPLY=$ctx
+  [[ -n $ctx ]]
 }
 
 # Esc goes up one menu: out of the option or resource list (toggles kept), then from an action's

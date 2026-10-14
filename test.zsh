@@ -387,5 +387,40 @@ else
   print "FAIL :. picker: got ${(q)$(<$out)}"; fail=1
 fi
 
+# C (capital only) picks a kubeconfig context in fzf and sets --context on the line; c does not.
+cat >| $fake/kubectl <<'SH'
+#!/bin/sh
+case "$*" in
+  *current-context*) echo staging ;;
+  *get-contexts*) printf 'staging\nprod\nmgmt\n' ;;
+  *) echo "unexpected: $*" >&2; exit 1 ;;
+esac
+SH
+for keys want in C 'kubectl --context prod get -n ns pods' c 'kubectl get -n ns pods'; do
+  : >| $out
+  zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
+  zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
+  zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+  drain 4
+  zpty -w -n t "kubectl get -n ns pods"$'\em'
+  drain 4
+  zpty -w -n t $keys
+  drain 20
+  if [[ $keys == C ]]; then
+    zpty -w -n t prod
+    drain 10
+    zpty -w -n t $'\r'
+    drain 10
+  fi
+  zpty -w -n t $'\x14'
+  for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+  zpty -d t
+  if [[ $(<$out) == "$want" ]]; then
+    print "ok   context key ${keys}: ${(q)$(<$out)}"
+  else
+    print "FAIL context key ${keys}: got ${(q)$(<$out)}, want ${(q)want}"; fail=1
+  fi
+done
+
 rm -rf $out $out.ran $kv $fake
 exit $fail

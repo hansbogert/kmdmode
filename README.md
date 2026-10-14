@@ -29,6 +29,11 @@ With no kubectl command in recent history, it starts from the pods overview, as 
 the line's cluster serves (`kubectl api-resources`, so built-ins and every CRD the apiextensions API
 registered, qualified like `certificates.cert-manager.io`). On a `kview` line it stays watched.
 
+**C** (capital only; lowercase `c` is not it) picks a kubeconfig context in fzf below the prompt,
+headed by the one the line uses now, and sets `--context NAME` on the line: replacing its own, or
+added right after `kubectl`. Only the line changes, not the kubeconfig's current context, so other
+terminals are unaffected. On a `kview` line it goes into the watched command.
+
 **Esc** goes up one menu: out of the option list (toggles kept), then from an action's menu
 (`logs`, `rollout`, `scale`, `describe`, `delete`) to the get menu of the resource it acts on,
 e.g. `kubectl rollout restart -n ns deploy/d` up to `kubectl get -n ns deploy/d`, and from a

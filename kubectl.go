@@ -309,6 +309,10 @@ func kubectlMode(cmd []string) (mode, bool) {
 	m.up = k.parent()
 	m.retype = k.retype
 	m.cluster = k.clusterFlags()
+	m.context = k.withContext
+	if f, ok := k.find("--context"); ok {
+		m.currentContext = bare(k.value(f))
+	}
 	if ref, ok := singleResource(k); ok {
 		// Resolved on the keypress, so the menu itself never waits on the cluster.
 		m.actions = append(m.actions, action{"U", "owner", func() []string {
@@ -347,6 +351,15 @@ func (k kubectlCmd) retype(typ string) []string {
 		return !global && f.long != "--all-namespaces" && f.long != "--output"
 	})
 	return k.rebuild("get", typ)
+}
+
+// withContext sets --context name, replacing the line's own or adding it after kubectl, where every
+// subcommand takes it.
+func (k kubectlCmd) withContext(name string) []string {
+	if f, ok := k.find("--context"); ok {
+		return k.splice(f.start, f.end, []string{"--context", name})
+	}
+	return k.splice(1, 1, []string{"--context", name})
 }
 
 // clusterFlags returns the line's global flags (cluster, identity, namespace), unquoted for exec.
