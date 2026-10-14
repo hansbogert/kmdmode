@@ -1,11 +1,14 @@
 package main
 
 import (
+	"regexp"
 	"slices"
 	"strings"
 )
 
 var kubectlNames = set("kubectl", "k", "kubecolor")
+
+var subcommand = regexp.MustCompile(`^[a-z][a-z-]*$`)
 
 // Flag tables from kubectl v1.37.1: "short long kind" per flag, short "-" when there is none.
 // Regenerate a subcommand's table from the "--long=default:" lines of "kubectl <sub> --help";
@@ -154,6 +157,9 @@ func parseKubectl(cmd []string) (kubectlCmd, bool) {
 			k.flags = append(k.flags, f)
 		case k.sub == "":
 			k.sub = bare(w)
+			if !subcommand.MatchString(k.sub) { // e.g. "kubectl() {", a function definition
+				return kubectlCmd{}, false
+			}
 		default:
 			k.pos = append(k.pos, w)
 		}

@@ -66,8 +66,9 @@ _cmdmode_render() {
 }
 
 # On an empty prompt, Alt-m starts from the most recent command in history that has a mode, so
-# after "kubectl logs ..." ends you can carry on from it. Looks back 20 commands at most. At a top
-# menu, Esc on the recalled line, untouched, goes back to the empty prompt.
+# after "kubectl logs ..." ends you can carry on from it. Looks back 20 commands at most; with
+# none, it starts from the pods overview, as O gives it. At a top menu, Esc on the recalled line,
+# untouched, goes back to the empty prompt.
 _cmdmode_recall() {
   local n
   local -a words
@@ -80,7 +81,8 @@ _cmdmode_recall() {
       return
     fi
   done
-  BUFFER=
+  BUFFER=$("$_cmdmode_bin" apply O -- kubectl)
+  CURSOR=$#BUFFER
 }
 
 _cmdmode_enter() {

@@ -106,6 +106,7 @@ func TestApply(t *testing.T) {
 		{"O", "kubectl delete deploy d -n ns", "kview kubectl get deploy -A -o wide"},
 		{"O", "kubectl -n ns", "kview kubectl get pods -A -o wide"},
 		{"O", "kubectl", "kview kubectl get pods -A -o wide"},
+		{"O", "kubectl() { print hi }", ""}, // a function definition, not a kubectl command
 	}
 	for _, c := range cases {
 		out, ok := run(c.key, false, strings.Fields(c.in))

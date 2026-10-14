@@ -19,7 +19,9 @@ cmdmode [kubectl logs -]  [f] -f*  [p] -p  [t] --timestamps  [c] --all-container
 A line you **run from cmdmode** (Enter) comes back in cmdmode once it ends, e.g. after
 `kubectl logs -f` on ctrl-c, so the next key carries on from it; Esc on that returned line clears
 it. On an **empty prompt**, Alt-m brings back the most recent command (of the last 20) that has a
-mode, so after `kubectl logs ...` ends you carry on from it; Esc on it goes back to the empty prompt. Keys are case-insensitive.
+mode, so after `kubectl logs ...` ends you carry on from it; Esc on it goes back to the empty prompt.
+With no kubectl command in recent history, it starts from the pods overview, as O gives it
+(`kview kubectl get pods -A -o wide`), in cmdmode. Keys are case-insensitive.
 
 **`:`** switches the resource type the line lists, keeping where it looks (context, `-n`/`-A`,
 `-o`; names and selectors belong to the old type): `[p] pods  [d] deployments  [s] statefulsets

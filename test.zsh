@@ -185,6 +185,25 @@ else
   print "FAIL empty prompt + Alt-m recall: got ${(q)$(<$out)}"; fail=1
 fi
 
+# With no kubectl command in history, Alt-m on an empty prompt starts from the pods overview.
+: >| $out
+TTY=
+zpty -b t "env -i HOME=$HOME TERM=xterm zsh -f -i"
+zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh"
+zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+drain 6
+zpty -w -n t $'\em'
+local screen chunk
+repeat 10 { while zpty -rt t chunk; do screen+=$chunk; done; sleep 0.05 }
+zpty -w -n t $'\x14'
+for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+zpty -d t
+if [[ $(<$out) == 'kview kubectl get pods -A -o wide' && $screen == *'cmdmode [kview kubectl get]'* ]]; then
+  print "ok   empty prompt, no kubectl history, Alt-m: ${(q)$(<$out)} in cmdmode"
+else
+  print "FAIL empty prompt, no kubectl history: got ${(q)$(<$out)}"; fail=1
+fi
+
 # The same recall after a rollout restart: its line has a real menu, so T follows the rollout.
 : >| $out
 zpty -b t "env -i HOME=$HOME TERM=xterm zsh -f -i"
