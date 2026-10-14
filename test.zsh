@@ -10,7 +10,7 @@ fail=0
 check() {  # check LINE KEYS WANT [TEXT the terminal must show]
   local line=$1 keys=$2 want=$3 shows=$4
   : >| $out
-  zpty -b t "env -i HOME=$HOME TERM=xterm zsh -f -i"
+  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
   zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; alias kgp='kubectl get pods'"
   zpty -w t "_dump() { [[ -n \$BUFFER ]] && print -rn -- \$BUFFER >| $out }; zle -N _dump"
   zpty -w t "bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
@@ -90,7 +90,7 @@ drain() {
 
 check_pick() {  # check_pick KEYS WANT [KEY pressed on the returned prompt]
   : >| $out
-  zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
+  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
   zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
   zpty -w t "_dump() { [[ -n \$BUFFER ]] && print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
   zpty -w t "KVIEW_INTERVAL=0.3 kview kubectl get pods -A -o wide"
@@ -112,7 +112,7 @@ check_pick() {  # check_pick KEYS WANT [KEY pressed on the returned prompt]
 print -r -- $'#!/bin/sh\ncase "$*" in *go-template*) printf "k8s-app=kube-dns\\ntier=node\\nzone=a\\n"; exit;; esac' >| $fake/labels
 sed -i '1r '$fake/labels $fake/kubectl
 : >| $out
-zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
+zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
 zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
 zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
 zpty -w t "KVIEW_INTERVAL=0.3 kview kubectl get pods -A -o wide"
@@ -170,7 +170,7 @@ else
 fi
 # Alt-m on an empty prompt recalls the last command with a mode, skipping ones without.
 : >| $out
-zpty -b t "env -i HOME=$HOME TERM=xterm zsh -f -i"
+zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
 zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { :; }"
 zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
 zpty -w t "kubectl logs -n ns p --tail 5"
@@ -188,7 +188,7 @@ fi
 # With no kubectl command in history, Alt-m on an empty prompt starts from the pods overview.
 : >| $out
 TTY=
-zpty -b t "env -i HOME=$HOME TERM=xterm zsh -f -i"
+zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
 zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh"
 zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
 drain 6
@@ -206,7 +206,7 @@ fi
 
 # The same recall after a rollout restart: its line has a real menu, so T follows the rollout.
 : >| $out
-zpty -b t "env -i HOME=$HOME TERM=xterm zsh -f -i"
+zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
 zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { :; }"
 zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
 zpty -w t "kubectl rollout restart -n ns deploy/d"
@@ -223,7 +223,7 @@ fi
 # Esc on a recalled rollout line goes up to its workload's get menu; there, at the top, Esc exits.
 for keys want in $'\e' '[kubectl get -n ns deploy/d]' $'\e\e' '[kubectl get -n ns deploy/d]'; do
   : >| $out
-  zpty -b t "env -i HOME=$HOME TERM=xterm zsh -f -i"
+  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
   zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { :; }"
   zpty -w t "_dump() { print -rn -- \"[\$BUFFER]\" >| $out }; zle -N _dump; bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
   zpty -w t "kubectl rollout restart -n ns deploy/d"
@@ -244,7 +244,7 @@ done
 # logs menu to the pod's get menu.
 for keys want in g 'kubectl get -n ns pod p' $'\e' 'kubectl get -n ns pod p'; do
   : >| $out
-  zpty -b t "env -i HOME=$HOME TERM=xterm zsh -f -i"
+  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
   rm -f $out.ran
   zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { print -rn -- \"\$*\" >| $out.ran }"
   zpty -w t "_dump() { print -rn -- \"[\$BUFFER]\" >| $out }; zle -N _dump"
@@ -270,7 +270,7 @@ echo "NAMESPACE     NAME        READY   STATUS             RESTARTS   AGE   IP  
 echo "kube-system   coredns-x   1/1     Running            0          2d    10.0.0.1   node-a   <none>           <none>"
 SH
 : >| $out
-zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
+zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
 zpty -w t "stty rows 20 cols 140; PS1='> '; source $root/cmdmode.plugin.zsh"
 zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
 zpty -w t "KVIEW_INTERVAL=0.5 kview kubectl get pods -A -o wide"
@@ -311,7 +311,7 @@ esac
 SH
 for keys want in $'\es\r' 'kubectl get -n ns pods new-c ' $'\es\e' 'kview kubectl get pods -A --sort-by=.metadata.creationTimestamp '; do
   : >| $out
-  zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
+  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
   zpty -w t "stty rows 20 cols 140; PS1='> '; source $root/cmdmode.plugin.zsh"
   zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
   zpty -w t "KVIEW_INTERVAL=0.5 kview kubectl get pods -A"
@@ -339,7 +339,7 @@ case "$*" in
 esac
 SH
 : >| $out
-zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
+zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
 zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh"
 zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
 drain 4
@@ -366,7 +366,7 @@ case "$*" in
 esac
 SH
 : >| $out
-zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
+zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
 zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
 zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
 drain 4
@@ -391,14 +391,14 @@ fi
 cat >| $fake/kubectl <<'SH'
 #!/bin/sh
 case "$*" in
-  *current-context*) echo staging ;;
+  *current-context*) echo mgmt ;;
   *get-contexts*) printf 'staging\nprod\nmgmt\n' ;;
   *) echo "unexpected: $*" >&2; exit 1 ;;
 esac
 SH
 for keys want in C 'kubectl --context prod get -n ns pods' c 'kubectl get -n ns pods'; do
   : >| $out
-  zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
+  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
   zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
   zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
   drain 4
@@ -419,6 +419,30 @@ for keys want in C 'kubectl --context prod get -n ns pods' c 'kubectl get -n ns 
     print "ok   context key ${keys}: ${(q)$(<$out)}"
   else
     print "FAIL context key ${keys}: got ${(q)$(<$out)}, want ${(q)want}"; fail=1
+  fi
+done
+
+# Context first: a line naming no context opens the picker on entry, the current one listed
+# first (Enter keeps it); Esc there leaves cmdmode with the line untouched. The fake kubeconfig's
+# current context, mgmt, comes last from get-contexts.
+for keys want in $'\r' 'kubectl --context mgmt get -n ns pods' $'\e' 'kubectl get -n ns pods'; do
+  : >| $out
+  zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
+  zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
+  zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump"
+  zpty -w t "bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
+  drain 4
+  zpty -w -n t "kubectl get -n ns pods"$'\em'
+  drain 20
+  zpty -w -n t $keys
+  drain 12
+  zpty -w -n t $'\x14'
+  for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+  zpty -d t
+  if [[ $(<$out) == "$want" ]]; then
+    print "ok   context first, ${(q)keys}: ${(q)$(<$out)}"
+  else
+    print "FAIL context first, ${(q)keys}: got ${(q)$(<$out)}, want ${(q)want}"; fail=1
   fi
 done
 

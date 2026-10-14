@@ -5,7 +5,8 @@
 //
 //	cmdmode menu -- WORD...        print the mode and its actions and options, tab-separated:
 //	                               "mode NAME", "action KEY LABEL", "option KEY LABEL on|off",
-//	                               and "up" when it has a parent menu
+//	                               "up" when it has a parent menu, "nocontext" when the line
+//	                               names no --context
 //	cmdmode apply KEY -- WORD...   print the line after action KEY; exit 1 if it does not apply
 //	cmdmode toggle KEY -- WORD...  print the line after toggling option KEY; exit 1 likewise
 //	cmdmode up -- WORD...          print the line of the parent menu; exit 1 at a top menu
@@ -47,6 +48,9 @@ func main() {
 		}
 		if m.context != nil { // C, case-sensitive: the zsh side runs the picker
 			fmt.Println("action\tC\tcontext")
+			if m.currentContext == "" {
+				fmt.Println("nocontext") // so entering cmdmode asks for one first
+			}
 		}
 		if m.retype != nil {
 			for _, r := range resourceKeys {

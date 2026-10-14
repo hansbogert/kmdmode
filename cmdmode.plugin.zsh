@@ -85,8 +85,24 @@ _cmdmode_recall() {
   CURSOR=$#BUFFER
 }
 
+# Unless the line names a context, entering cmdmode asks for one first: acting on whatever context
+# the kubeconfig happens to point at is too easy a mistake against production. The current one is
+# listed first, so keeping it is one Enter; Esc there leaves the line alone. CMDMODE_CONTEXT_FIRST=0
+# turns this off.
 _cmdmode_enter() {
   [[ -z ${BUFFER//[[:space:]]/} ]] && _cmdmode_recall
+  if [[ ${CMDMODE_CONTEXT_FIRST:-1} != 0 ]]; then
+    local -a words
+    _cmdmode_words
+    if [[ ${(f)"$("$_cmdmode_bin" menu -- "${words[@]}")"} == *nocontext* ]]; then
+      local out
+      if ! _cmdmode_pick_context; then
+        zle -M "cmdmode: pick a context to start; Esc cancelled"
+        return
+      fi
+      out=$("$_cmdmode_bin" context "$REPLY" -- "${words[@]}") && BUFFER=$out && CURSOR=$#BUFFER
+    fi
+  fi
   _cmdmode_prev_keymap=$KEYMAP
   _cmdmode_sub=
   zle -K cmdmode
@@ -177,7 +193,9 @@ _cmdmode_pick_context() {
   local -a lines
   [[ -x $fzf ]] || fzf=fzf
   lines=(${(f)"$("$_cmdmode_bin" contexts -- "${words[@]}")"}) || return 1
-  ctx=$(print -rl -- ${lines[2,-1]} | $fzf --height=40% --layout=reverse --prompt="context > " \
+  # The one in use first, so keeping it is a single Enter.
+  ctx=$(print -rl -- ${lines[1]} ${${lines[2,-1]}:#${lines[1]}} |
+    $fzf --height=40% --layout=reverse --prompt="context > " \
     --header="now: ${lines[1]:-?}  enter: use it  esc: cancel")
   zle reset-prompt
   REPLY=$ctx

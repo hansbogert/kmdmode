@@ -29,6 +29,12 @@ With no kubectl command in recent history, it starts from the pods overview, as 
 the line's cluster serves (`kubectl api-resources`, so built-ins and every CRD the apiextensions API
 registered, qualified like `certificates.cert-manager.io`). On a `kview` line it stays watched.
 
+**Context first.** When the line names no `--context`, entering cmdmode opens the context picker
+before anything else, so nothing acts on whatever context the kubeconfig happens to point at. The
+current one is listed first (one Enter keeps it, now explicit on the line); Esc there leaves cmdmode
+with the line untouched. Lines cmdmode hands back carry the context along, so this asks once per
+flow. `CMDMODE_CONTEXT_FIRST=0` turns it off.
+
 **C** (capital only; lowercase `c` is not it) picks a kubeconfig context in fzf below the prompt,
 headed by the one the line uses now, and sets `--context NAME` on the line: replacing its own, or
 added right after `kubectl`. Only the line changes, not the kubeconfig's current context, so other
