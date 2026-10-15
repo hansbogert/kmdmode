@@ -25,7 +25,7 @@ func TestApply(t *testing.T) {
 		{"l", "ls -l", ""},
 		{"i", "kubectl get deploy d -n ns -o yaml", "kubectl describe -n ns deploy d"},
 		{"i", "kubectl get pods -A -l app=api", "kubectl describe -A -l app=api pods"},
-		{"x", "kubectl get pods p", ""},
+		{"z", "kubectl get pods p", ""},
 		{"l", "kubectl get pods p", "kubectl logs p"},
 		{"i", "kubectl get pods p", "kubectl describe pods p"},
 		{"l", "kubectl get -f pods.yaml", ""},
@@ -94,6 +94,13 @@ func TestApply(t *testing.T) {
 		{"t", "kubectl get rs r", ""},
 		{"o", "kubectl rollout restart -n ns deploy/d", "kview kubectl get deploy -A -o wide"},
 		{"o", "kubectl scale -n ns sts/s --replicas=2", "kview kubectl get sts -A -o wide"},
+		// exec: one named pod, sh by default; the exec line goes up to the pod's get.
+		{"x", "kubectl get -n ns pods p -o wide", "kubectl exec -n ns -it p -- sh"},
+		{"x", "kubectl logs --context c -n ns p -f", "kubectl exec --context c -n ns -it p -- sh"},
+		{"x", "kubectl describe pod/p", "kubectl exec -it p -- sh"},
+		{"x", "kubectl get pods", ""},
+		{"x", "kubectl get deploy d", ""},
+		{"X", "kubectl get pods p", ""},
 		// overview: the type's full list across namespaces, wide, in kview, from any kubectl line.
 		{"o", "kubectl logs -n ns -f p --tail 5", "kview kubectl get pods -A -o wide"},
 		{"o", "kubectl get deploy/d -o yaml --context c", "kview kubectl get --context c deploy -A -o wide"},
@@ -160,6 +167,23 @@ func TestMenu(t *testing.T) {
 		if want := o.key == "f"; o.on != want {
 			t.Errorf("option %s: on=%v, want %v", o.key, o.on, want)
 		}
+	}
+}
+
+func TestExecShell(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"kubectl exec -n ns -it p -- sh", "kubectl exec -n ns -it p -- bash"},
+		{"kubectl exec -n ns -it -c app p -- bash", "kubectl exec -n ns -it -c app p -- sh"},
+		{"kubectl exec -it p -- ls -l", ""},
+		{"kubectl exec -it p", ""},
+	}
+	for _, c := range cases {
+		out, ok := run("b", true, strings.Fields(c.in))
+		check(t, "b", c.in, c.want, out, ok)
+	}
+	if out, ok := up(strings.Fields("kubectl exec --context c -n ns -it p -- sh")); !ok ||
+		strings.Join(out, " ") != "kubectl get --context c -n ns pod p" {
+		t.Errorf("exec up: %q", out)
 	}
 }
 

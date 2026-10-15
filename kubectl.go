@@ -44,6 +44,9 @@ var kubectlFlagTables = map[string]flagTable{
 		- --ignore-not-found bool; -i --interactive bool; -k --kustomize value; - --now bool
 		-o --output value; - --raw value; -R --recursive bool; -l --selector value
 		- --timeout value; - --wait bool`),
+	"exec": parseFlagTable(`
+		-c --container value; -f --filename value; - --pod-running-timeout value; -q --quiet bool
+		-i --stdin bool; -t --tty bool`),
 	"describe": parseFlagTable(`
 		-A --all-namespaces bool; - --chunk-size value; -f --filename value
 		-k --kustomize value; -R --recursive bool; -l --selector value; - --show-events bool`),
@@ -307,6 +310,16 @@ func kubectlMode(cmd []string) (mode, bool) {
 		}})
 	}
 	m.up = k.parent()
+	if pod, ok := k.namedPod(); ok {
+		m.actions = append(m.actions, action{"x", "exec", func() []string {
+			return k.without("--output").rebuild("exec", "-it", pod, "--", "sh")
+		}})
+	}
+	if k.sub == "exec" {
+		if opt, ok := k.shellOption(); ok {
+			m.options = append(m.options, opt)
+		}
+	}
 	m.retype = k.retype
 	m.cluster = k.clusterFlags()
 	m.context = k.withContext
@@ -375,6 +388,30 @@ func (k kubectlCmd) clusterFlags() []string {
 	return flags
 }
 
+// namedPod returns the pod a line names, if it names exactly one (get, describe or delete of a
+// pod, or its logs line).
+func (k kubectlCmd) namedPod() (string, bool) {
+	ref, ok := singleResource(k)
+	typ, name, _ := strings.Cut(ref, "/")
+	return name, ok && podTypes[typ]
+}
+
+// shellOption is the exec line's b: the shell after "--", sh (the default, in nearly every image)
+// or bash (not in every image).
+func (k kubectlCmd) shellOption() (option, bool) {
+	if k.end >= len(k.words) || k.end+2 != len(k.words) {
+		return option{}, false // no "-- CMD", or a command with arguments
+	}
+	cur := bare(k.words[k.end+1])
+	if cur != "sh" && cur != "bash" {
+		return option{}, false
+	}
+	return option{"b", "bash", cur == "bash", func() []string {
+		next := map[string]string{"sh": "bash", "bash": "sh"}[cur]
+		return k.splice(k.end+1, len(k.words), []string{next})
+	}}, true
+}
+
 // parent is the menu above the line's: the get of the resource that a describe, delete, logs,
 // rollout or scale line acts on. A get line, a list and anything else are top menus (nil).
 func (k kubectlCmd) parent() func() []string {
@@ -397,6 +434,11 @@ func (k kubectlCmd) parent() func() []string {
 			return nil
 		}
 		args = refs
+	case "exec":
+		if len(k.pos) == 0 {
+			return nil
+		}
+		args = []string{"pod", k.pos[0]}
 	default:
 		return nil
 	}
