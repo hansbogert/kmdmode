@@ -3,7 +3,6 @@ package main
 import (
 	"regexp"
 	"slices"
-	"strings"
 )
 
 // A mode is what cmdmode offers for one recognised command, e.g. "kubectl get": actions rewrite
@@ -54,7 +53,7 @@ func kviewMode(prefix, cmd []string) (mode, bool) {
 		return mode{}, false
 	}
 	m := mode{name: "kview " + inner.name}
-	m.actions = []action{{"W", "unwatch", func() []string { return cmd }}}
+	m.actions = []action{{"w", "unwatch", func() []string { return cmd }}}
 	m.up = func() []string { return cmd }
 	m.cluster = inner.cluster
 	m.currentContext = inner.currentContext
@@ -81,12 +80,15 @@ func up(words []string) ([]string, bool) {
 	})
 }
 
-// retype rewrites the target command to list typ, or the built-in type keyed typ (":" menu).
+// retype rewrites the target command to list typ, or the built-in type keyed typ (":" menu). A
+// single character is only ever a key: no type is that short, so an unlisted one is no type.
 func retype(typ string, words []string) ([]string, bool) {
-	for _, r := range resourceKeys {
-		if strings.EqualFold(r.key, typ) {
-			typ = r.name
+	if len(typ) == 1 {
+		i := slices.IndexFunc(resourceKeys, func(r struct{ key, name string }) bool { return r.key == typ })
+		if i < 0 {
+			return nil, false
 		}
+		typ = resourceKeys[i].name
 	}
 	return spliceTarget(words, func(m mode) []string {
 		if m.retype == nil {
@@ -127,7 +129,8 @@ func modeFor(words []string) (mode, bool) {
 	return m, ok
 }
 
-// run applies the action (or, with toggle, the option) bound to key, case-insensitively, and
+// run applies the action (or, with toggle, the option) bound to key, case-sensitively (keys are
+// lowercase; capitals are kept for the few that must not be hit by accident, C and Y), and
 // splices the result back into the full line, leaving pipes, other commands and env assignments
 // untouched.
 func run(key string, toggle bool, words []string) ([]string, bool) {
@@ -138,13 +141,13 @@ func run(key string, toggle bool, words []string) ([]string, bool) {
 	var rewrite func() []string
 	if toggle {
 		for _, o := range m.options {
-			if strings.EqualFold(o.key, key) {
+			if o.key == key {
 				rewrite = o.toggle
 			}
 		}
 	} else {
 		for _, a := range m.actions {
-			if strings.EqualFold(a.key, key) {
+			if a.key == key {
 				rewrite = a.apply
 			}
 		}

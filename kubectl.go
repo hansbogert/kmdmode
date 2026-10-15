@@ -254,7 +254,7 @@ func kubectlMode(cmd []string) (mode, bool) {
 	switch k.sub {
 	case "get", "describe", "delete":
 		if logArgs, ok := podLogTarget(k); ok {
-			m.actions = append(m.actions, action{"L", "logs", func() []string {
+			m.actions = append(m.actions, action{"l", "logs", func() []string {
 				return k.rebuild("logs", logArgs...)
 			}})
 		}
@@ -279,7 +279,7 @@ func kubectlMode(cmd []string) (mode, bool) {
 				}})
 			}
 			if len(refs) == 1 {
-				m.actions = append(m.actions, action{"L", "logs", func() []string {
+				m.actions = append(m.actions, action{"l", "logs", func() []string {
 					return k.rebuild("logs", refs...)
 				}})
 			}
@@ -302,7 +302,7 @@ func kubectlMode(cmd []string) (mode, bool) {
 		}
 	}
 	if k.sub == "get" || k.sub == "describe" {
-		m.actions = append(m.actions, action{"W", "watch", func() []string {
+		m.actions = append(m.actions, action{"w", "watch", func() []string {
 			return append([]string{"kview"}, k.dropFlags("--watch", "--watch-only")...)
 		}})
 	}
@@ -315,12 +315,12 @@ func kubectlMode(cmd []string) (mode, bool) {
 	}
 	if ref, ok := singleResource(k); ok {
 		// Resolved on the keypress, so the menu itself never waits on the cluster.
-		m.actions = append(m.actions, action{"U", "owner", func() []string {
+		m.actions = append(m.actions, action{"u", "owner", func() []string {
 			out, _ := k.owner(ref)
 			return out
 		}})
 	}
-	m.actions = append(m.actions, action{"O", "overview", k.overview})
+	m.actions = append(m.actions, action{"o", "overview", k.overview})
 	for _, o := range kubectlOptions[k.sub] {
 		opt := k.option(o)
 		if o.long == "--all-namespaces" && !opt.on && k.sub == "get" && len(k.pos) > 0 &&
@@ -404,8 +404,8 @@ func (k kubectlCmd) parent() func() []string {
 }
 
 // Subcommands that address resources alike ("TYPE NAME..." or "TYPE/NAME"), so a line converts
-// between them. I is describe as in "inspect", leaving D for delete.
-var resourceVerbs = []struct{ key, sub string }{{"G", "get"}, {"I", "describe"}, {"D", "delete"}}
+// between them. i is describe as in "inspect", leaving d for delete.
+var resourceVerbs = []struct{ key, sub string }{{"g", "get"}, {"i", "describe"}, {"d", "delete"}}
 
 // namesResources reports whether the line names specific resources. Delete is offered only then:
 // a selector, -A, a file or a bare type would make it delete everything that matches.
@@ -476,17 +476,17 @@ func workloadActions(k kubectlCmd, pos []string) []action {
 	}
 	var acts []action
 	if refs, ok := workloadRefs(pos, restartable); ok && rolloutVerb != "restart" {
-		acts = append(acts, action{"R", "restart", func() []string {
+		acts = append(acts, action{"r", "restart", func() []string {
 			return k.rebuild("rollout restart", refs...)
 		}})
 	}
 	if refs, ok := workloadRefs(pos, scalable); ok && k.sub != "scale" {
-		acts = append(acts, action{"S", "scale", func() []string {
+		acts = append(acts, action{"s", "scale", func() []string {
 			return append(k.rebuild("scale", refs...), "--replicas=")
 		}})
 	}
 	if refs, ok := workloadRefs(pos, restartable); ok && rolloutVerb != "status" {
-		acts = append(acts, action{"T", "status", func() []string {
+		acts = append(acts, action{"t", "status", func() []string {
 			return k.rebuild("rollout status", refs...)
 		}})
 	}

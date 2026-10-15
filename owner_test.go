@@ -55,8 +55,8 @@ func TestOwner(t *testing.T) {
 	}
 	for _, c := range cases {
 		seen = nil
-		out, ok := run("U", false, strings.Fields(c.in))
-		check(t, "U", c.in, c.want, out, ok)
+		out, ok := run("u", false, strings.Fields(c.in))
+		check(t, "u", c.in, c.want, out, ok)
 		// A deployment's pod takes one call.
 		if c.want == "kubectl get -n ns deploy/web" && len(seen) != 1 {
 			t.Errorf("deployment pod: %d lookups: %q", len(seen), seen)
@@ -83,7 +83,7 @@ func TestOwnerOffered(t *testing.T) {
 		m, _ := modeFor(strings.Fields(in))
 		got := false
 		for _, a := range m.actions {
-			got = got || a.key == "U"
+			got = got || a.key == "u"
 		}
 		if got != want {
 			t.Errorf("%q: U offered %v, want %v", in, got, want)

@@ -81,7 +81,7 @@ _cmdmode_recall() {
       return
     fi
   done
-  BUFFER=$("$_cmdmode_bin" apply O -- kubectl)
+  BUFFER=$("$_cmdmode_bin" apply o -- kubectl)
   CURSOR=$#BUFFER
 }
 
@@ -146,7 +146,7 @@ _cmdmode_dispatch() {
     fi
     return
   fi
-  if [[ -z $_cmdmode_sub && $KEYS == [uU] ]]; then  # U asks the cluster: say so while it does
+  if [[ -z $_cmdmode_sub && $KEYS == u ]]; then  # U asks the cluster: say so while it does
     zle -M "cmdmode: asking the cluster for the owner…"
     zle -R
   fi
@@ -163,7 +163,7 @@ _cmdmode_dispatch() {
     BUFFER=$out
     CURSOR=$#BUFFER
     _cmdmode_render "" quiet
-  elif [[ -z $_cmdmode_sub && $KEYS == [uU] ]]; then
+  elif [[ -z $_cmdmode_sub && $KEYS == u ]]; then
     _cmdmode_render "no owner found; "
   else
     _cmdmode_render "no '$KEYS' here; "

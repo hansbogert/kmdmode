@@ -6,10 +6,10 @@ Type `kubectl get pods -n ns pod1`, press **Alt-m**, and the message line names 
 keys:
 
 ```
-cmdmode [kubectl get]  [L] logs  [I] describe  [-] options  [:] resource  [Esc] exit
+cmdmode [kubectl get]  [l] logs  [i] describe  [-] options  [:] resource  [Esc] exit
 ```
 
-Press **H** and the line becomes `kubectl logs -n ns pod1`; the mode follows the line, so you are
+Press **l** and the line becomes `kubectl logs -n ns pod1`; the mode follows the line, so you are
 now in `[kubectl logs]`. Press **-** for that mode's flags, each a key that toggles it (`*` = on):
 
 ```
@@ -20,8 +20,8 @@ A line you **run from cmdmode** (Enter) comes back in cmdmode once it ends, e.g.
 `kubectl logs -f` on ctrl-c, so the next key carries on from it; Esc on that returned line clears
 it. On an **empty prompt**, Alt-m brings back the most recent command (of the last 20) that has a
 mode, so after `kubectl logs ...` ends you carry on from it; Esc on it goes back to the empty prompt.
-With no kubectl command in recent history, it starts from the pods overview, as O gives it
-(`kview kubectl get pods -A -o wide`), in cmdmode. Keys are case-insensitive.
+With no kubectl command in recent history, it starts from the pods overview, as o gives it
+(`kview kubectl get pods -A -o wide`), in cmdmode. Keys are case-sensitive and lowercase, except the two you should not hit by accident: **C** (context) and **Y** (confirming a delete).
 
 **`:`** switches the resource type the line lists, keeping where it looks (context, `-n`/`-A`,
 `-o`; names and selectors belong to the old type): `[p] pods  [d] deployments  [s] statefulsets
@@ -43,7 +43,7 @@ terminals are unaffected. On a `kview` line it goes into the watched command.
 **Esc** goes up one menu: out of the option list (toggles kept), then from an action's menu
 (`logs`, `rollout`, `scale`, `describe`, `delete`) to the get menu of the resource it acts on,
 e.g. `kubectl rollout restart -n ns deploy/d` up to `kubectl get -n ns deploy/d`, and from a
-`kview ...` line (after W or O) to the plain command it watches, then, at a top menu, out of
+`kview ...` line (after w or o) to the plain command it watches, then, at a top menu, out of
 cmdmode. The hint says `[Esc] up` or `[Esc] exit`. **Enter** runs the line (in every menu, so the hint leaves it out).
 
 ## Install
@@ -74,8 +74,8 @@ The widget splits the buffer with `${(z)BUFFER}` (quotes stay inside the words, 
 round-trips), expands a leading alias, and asks the Go helper:
 
 ```sh
-cmdmode hints -- kubectl get pods -n ns pod1      # H<TAB>logs, D<TAB>describe
-cmdmode apply H -- kubectl get pods -n ns pod1    # kubectl logs -n ns pod1
+cmdmode menu -- kubectl get pods -n ns pod1       # mode, action, option ... lines
+cmdmode apply l -- kubectl get pods -n ns pod1    # kubectl logs -n ns pod1
 ```
 
 The helper rewrites the last simple command that has an action, so env prefixes
@@ -85,38 +85,38 @@ The helper rewrites the last simple command that has an action, so env prefixes
 
 | Mode               | Actions                                       | Options (after `-`)                                    |
 |--------------------|-----------------------------------------------|--------------------------------------------------------|
-| `kubectl get`      | L logs, I describe, D delete, R restart, S scale, W watch, O overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels`, s sort by age |
-| `kubectl logs`     | G get, I describe, D delete, R restart, S scale, O overview | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
-| `kubectl describe` | L logs, G get, D delete, R restart, S scale, W watch, O overview | e `--show-events=false`                                |
-| `kubectl delete`   | L logs, G get, I describe, R restart, S scale, O overview |
-| `kubectl rollout ...`, `kubectl scale ...` | G get, I describe, L logs, R restart, S scale, T status (minus its own), O overview | |                                                        |
-| any other `kubectl ...` | O overview                               |                                                        |
-| `kview kubectl ...` (after W or O) | W unwatch (drops kview)    | those of the kubectl command inside, kview kept        |
+| `kubectl get`      | l logs, i describe, d delete, r restart, s scale, w watch, o overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels`, s sort by age |
+| `kubectl logs`     | g get, i describe, d delete, r restart, s scale, o overview | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
+| `kubectl describe` | l logs, g get, d delete, r restart, s scale, w watch, o overview | e `--show-events=false`                                |
+| `kubectl delete`   | l logs, g get, i describe, r restart, s scale, o overview |
+| `kubectl rollout ...`, `kubectl scale ...` | g get, i describe, l logs, r restart, s scale, t status (minus its own), o overview | |                                                        |
+| any other `kubectl ...` | o overview                               |                                                        |
+| `kview kubectl ...` (after w or o) | w unwatch (drops kview)    | those of the kubectl command inside, kview kept        |
 
-**R** (`kubectl rollout restart`), **S** (`kubectl scale ... --replicas=`) and **T** (`kubectl rollout
+**r** (`kubectl rollout restart`), **s** (`kubectl scale ... --replicas=`) and **t** (`kubectl rollout
 status`, which follows a rollout until done) are offered for named workloads of a kind the command
 accepts: restart and status for deployments, statefulsets and daemonsets, scale for deployments,
-statefulsets and replicasets. S leaves cmdmode with the cursor after
+statefulsets and replicasets. s leaves cmdmode with the cursor after
 `--replicas=`, so you type the count and Enter.
 
-**U** (owner) goes from any single named resource to what owns it, e.g. from a pod to what runs
-it, so R, S and T are in reach from the pods you browse: `kubectl get -n ns pods web-7d9f8-x2k` → U
+**u** (owner) goes from any single named resource to what owns it, e.g. from a pod to what runs
+it, so r, s and t are in reach from the pods you browse: `kubectl get -n ns pods web-7d9f8-x2k` → u
 → `kubectl get -n ns deploy/web`. It asks the cluster on the keypress (the menu itself never
 does), following ownerReferences up: pod → ReplicaSet → Deployment, pod → Job → CronJob, a Secret
 → the operator object that made it (`clickhousecluster.clickhouse.com/analytics`; kinds without a
 short name are written kind.group, which kubectl resolves for any CRD). A Deployment is read off
 its ReplicaSet's name (`<deployment>-<pod-template-hash>`), so a pod takes one call. Something you
-created yourself, like most Certificates, has no owner, and U says so.
+created yourself, like most Certificates, has no owner, and u says so.
 
-I is describe as in "inspect", leaving D for delete. **D is offered only when the line names
+i is describe as in "inspect", leaving d for delete. **d is offered only when the line names
 specific resources** (`pods p`, `deploy/d`), never for a bare type, `-l`, `-A`, `--all` or `-f`,
 where it would delete everything that matches; from `logs`, only for a plain pod name, since
-`logs deploy/d` reads one pod and deleting the deployment is a bigger step. D only rewrites the line, and
+`logs deploy/d` reads one pod and deleting the deployment is a bigger step. d only rewrites the line, and
 Enter on a delete line asks first: it runs only on a capital **Y**; any other key, lowercase `y`
-included, cancels and stays in cmdmode. H is offered for exactly one pod, or
+included, cancels and stays in cmdmode. l is offered for exactly one pod, or
 pods picked by `-l`.
 
-**O overview** is in every kubectl mode: a k9s-style live list of the line's resource type across
+**o overview** is in every kubectl mode: a k9s-style live list of the line's resource type across
 all namespaces, `kview kubectl get <type> -A -o wide`. The type is the one `get`/`describe`/
 `delete`/... names, else pods (for `logs`, `exec`, bare `kubectl -n ns`). It is the same view from
 any line: only the flags that pick the cluster and identity (`--context`, `--kubeconfig`, `--as`,
@@ -134,7 +134,7 @@ name would block keys after each refresh and lose an Enter now and then), ctrl-z
 faults, and
 Enter picks the row (below). Anything else, like `kubectl describe`, is a **document**: long lines
 wrap, and Enter puts the command itself back on the prompt. Either way the prompt it returns to
-is already in cmdmode, so one key carries on (e.g. L for logs of the picked pod). **W** (watch) in a get or describe mode wraps the line in kview.
+is already in cmdmode, so one key carries on (e.g. l for logs of the picked pod). **w** (watch) in a get or describe mode wraps the line in kview.
 
 kview fetches outside fzf: a background loop runs CMD into a file and then tells fzf, over a
 private socket, to reload from that file. While a reload runs, fzf drops cursor keys and holds
@@ -175,7 +175,7 @@ absent is added before any `--`.
 
 When an action switches subcommand, global flags (`-n`, `--context`, ...) carry over, and so do
 the flags the target subcommand also has, matched by long name: `get -f` is `--filename`, which
-describe has, while `logs -f` is `--follow`, which get does not. The rest is dropped. H is not
+describe has, while `logs -f` is `--follow`, which get does not. The rest is dropped. l is not
 offered with `-A`, `-f` or `-k`, or for more than one pod, because `kubectl logs` cannot do those.
 The flag tables in `kubectl.go` come from `kubectl <sub> --help` and `kubectl options`.
 

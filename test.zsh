@@ -32,29 +32,30 @@ check() {  # check LINE KEYS WANT [TEXT the terminal must show]
   fi
 }
 
-check 'kubectl get pods -n ns pod1 ' L 'kubectl logs -n ns pod1 ' 'cmdmode [kubectl logs]  [G] get'
+check 'kubectl get pods -n ns pod1 ' l 'kubectl logs -n ns pod1 ' 'cmdmode [kubectl logs]  [g] get'
 check "kubectl get pod 'my pod' -o wide" l "kubectl logs 'my pod'"
-check 'kubectl get deploy d -n ns' I 'kubectl describe -n ns deploy d' 'cmdmode [kubectl get]  [I] describe'
-check 'kubectl get deploy d' L 'kubectl get deploy d' "no 'L' here"
+check 'kubectl get deploy d -n ns' i 'kubectl describe -n ns deploy d' 'cmdmode [kubectl get]  [i] describe'
+check 'kubectl get deploy d' l 'kubectl get deploy d' "no 'l' here"
+check 'kubectl get pods p' L 'kubectl get pods p' "no 'L' here"  # keys are case-sensitive
 check 'kgp pod1' l 'kubectl logs pod1'
 check 'kubectl get pods p' $'\e'x 'kubectl get pods px'
 check 'kubectl get pods p' 'l-ft' 'kubectl logs p -f --timestamps' '[f] -f*'
 check "kubectl get pods p" "l-f" "kubectl logs p -f" "[f] -f*  [p]"
 check 'kubectl logs -f p' '-f'$'\e''g' 'kubectl get pod p' 'cmdmode [kubectl logs -]'
-check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kubectl]  [O] overview'
-check 'kubectl -n ns ' O 'kview kubectl get pods -A -o wide ' 'cmdmode [kview kubectl get]  [W] unwatch'
-check 'kubectl -n ns ' OW 'kubectl get pods -A -o wide '
-check 'kubectl -n ns ' $'O\e' 'kubectl get pods -A -o wide' '[Esc] up'  # watching is a menu below
+check 'kubectl -n ns ' o 'kview kubectl get pods -A -o wide ' 'cmdmode [kubectl]  [o] overview'
+check 'kubectl -n ns ' o 'kview kubectl get pods -A -o wide ' 'cmdmode [kview kubectl get]  [w] unwatch'
+check 'kubectl -n ns ' ow 'kubectl get pods -A -o wide '
+check 'kubectl -n ns ' $'o\e' 'kubectl get pods -A -o wide' '[Esc] up'  # watching is a menu below
 check 'kubectl get -n ns pods p -o wide' ':c' 'kubectl get -n ns -o wide configmaps' 'cmdmode [kubectl get :]  [p] pods'
 check 'kubectl get -n ns pods p' $':\e' 'kubectl get -n ns pods p'  # Esc leaves the resource list
 check 'kubectl get -n ns pods p -o wide' '-a' 'kubectl get -o wide pods -A'  # -A drops names and -n
-check 'kubectl get deploy d -n ns' R 'kubectl rollout restart -n ns deploy/d' 'cmdmode [kubectl rollout]'
-check 'kubectl get deploy d -n ns ' S3 'kubectl scale -n ns deploy/d --replicas=3'  # S leaves cmdmode
-check 'kubectl get deploy d -n ns' $'R\e' 'kubectl get -n ns deploy/d' '[Esc] up'
-check 'kubectl get deploy d -n ns' $'R\eI' 'kubectl describe -n ns deploy/d'
-check 'kubectl get deploy d -n ns' $'S\em\e' 'kubectl get -n ns deploy/d'  # up from S, which left cmdmode
-check 'kubectl get pods p' $'L-f\e\e' 'kubectl get pod p'  # up out of options, then up from logs
-check 'kubectl get pods p' $'L-f\e' 'kubectl logs p -f'  # Esc keeps the toggle: up, not undo
+check 'kubectl get deploy d -n ns' r 'kubectl rollout restart -n ns deploy/d' 'cmdmode [kubectl rollout]'
+check 'kubectl get deploy d -n ns ' s3 'kubectl scale -n ns deploy/d --replicas=3'  # S leaves cmdmode
+check 'kubectl get deploy d -n ns' $'r\e' 'kubectl get -n ns deploy/d' '[Esc] up'
+check 'kubectl get deploy d -n ns' $'r\ei' 'kubectl describe -n ns deploy/d'
+check 'kubectl get deploy d -n ns' $'s\em\e' 'kubectl get -n ns deploy/d'  # up from S, which left cmdmode
+check 'kubectl get pods p' $'l-f\e\e' 'kubectl get pod p'  # up out of options, then up from logs
+check 'kubectl get pods p' $'l-f\e' 'kubectl logs p -f'  # Esc keeps the toggle: up, not undo
 check 'kubectl get pods p' $'l-f\r' 'kubectl logs p -f'  # ran, and came back in cmdmode
 # kview: under a real tty, the header stays pinned and the rows refresh.
 kv=$(mktemp)
@@ -345,9 +346,9 @@ zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M c
 drain 4
 zpty -w -n t "kubectl get -n ns pods web-7d9f8-x2k"$'\em'
 drain 4
-zpty -w -n t U
+zpty -w -n t u
 drain 10
-zpty -w -n t R$'\x14'
+zpty -w -n t r$'\x14'
 for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
 zpty -d t
 if [[ $(<$out) == 'kubectl rollout restart -n ns deploy/web' ]]; then
@@ -455,7 +456,7 @@ for keys ran in Y 'delete -n ns pods p' y ''; do
   zpty -w -n t "kubectl get -n ns pods p"$'\em'
   drain 4
   local screen= asked= chunk
-  zpty -w -n t $'D\r'
+  zpty -w -n t $'d\r'
   repeat 6 { while zpty -rt t chunk; do asked+=$chunk; done; sleep 0.05 }
   zpty -w -n t $keys
   repeat 10 { while zpty -rt t chunk; do screen+=$chunk; done; sleep 0.05 }
