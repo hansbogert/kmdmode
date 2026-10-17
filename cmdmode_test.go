@@ -12,7 +12,7 @@ func TestApply(t *testing.T) {
 		{"l", "kubectl get pods -n ns pod1", "kubectl logs -n ns pod1"},
 		{"L", "kubectl get pods -n ns pod1", ""}, // keys are case-sensitive
 		{"l", "kubectl -n ns get pod pod1", "kubectl logs -n ns pod1"},
-		{"l", "kubectl get po pod1 --context prod -o wide", "kubectl logs --context prod pod1"},
+		{"l", "kubectl get po pod1 --context prod -o wide", "kubectl --context prod logs pod1"},
 		{"l", "kubectl get pod/pod1 -nns", "kubectl logs -nns pod1"},
 		{"l", "kubectl get pods --namespace=ns -l app=api", "kubectl logs --namespace=ns -l app=api"},
 		{"l", "k get pods 'pod1'", "k logs 'pod1'"},
@@ -42,7 +42,7 @@ func TestApply(t *testing.T) {
 		{"g", "kubectl describe -f x.yaml", "kubectl get -f x.yaml"},
 		// delete only for named resources, never for lists, selectors, -A or files.
 		{"d", "kubectl get pods p -n ns -o wide", "kubectl delete -n ns pods p"},
-		{"d", "kubectl get deploy/d --context c", "kubectl delete --context c deploy/d"},
+		{"d", "kubectl get deploy/d --context c", "kubectl --context c delete deploy/d"},
 		{"d", "kubectl describe pod p", "kubectl delete pod p"},
 		{"d", "kubectl logs -n ns -f p", "kubectl delete -n ns pod p"},
 		{"d", "kubectl get pods", ""},
@@ -65,7 +65,7 @@ func TestApply(t *testing.T) {
 		{"o", "kview kubectl get pods -A -o wide", ""},
 		// restart and scale: named workloads only, of a kind the command accepts.
 		{"r", "kubectl get deploy d -n ns -o wide", "kubectl rollout restart -n ns deploy/d"},
-		{"r", "kubectl get deployments.apps/d --context c", "kubectl rollout restart --context c deploy/d"},
+		{"r", "kubectl get deployments.apps/d --context c", "kubectl --context c rollout restart deploy/d"},
 		{"r", "kubectl describe sts a b -n ns", "kubectl rollout restart -n ns sts/a sts/b"},
 		{"r", "kubectl get ds/agent -n kube-system", "kubectl rollout restart -n kube-system ds/agent"},
 		{"r", "kubectl logs -n ns deploy/d -f", "kubectl rollout restart -n ns deploy/d"},
@@ -80,7 +80,7 @@ func TestApply(t *testing.T) {
 		{"s", "kubectl logs p", ""},
 		// rollout and scale lines: the workloads they name get the usual verbs, minus their own.
 		{"g", "kubectl rollout restart -n ns deploy/d", "kubectl get -n ns deploy/d"},
-		{"i", "kubectl rollout status deploy/d --context c", "kubectl describe --context c deploy/d"},
+		{"i", "kubectl rollout status deploy/d --context c", "kubectl --context c describe deploy/d"},
 		{"l", "kubectl rollout restart -n ns deploy/d", "kubectl logs -n ns deploy/d"},
 		{"t", "kubectl rollout restart -n ns deploy/d", "kubectl rollout status -n ns deploy/d"},
 		{"r", "kubectl rollout restart -n ns deploy/d", ""},
@@ -96,17 +96,17 @@ func TestApply(t *testing.T) {
 		{"o", "kubectl scale -n ns sts/s --replicas=2", "kview kubectl get sts -A -o wide"},
 		// exec: one named pod, sh by default; the exec line goes up to the pod's get.
 		{"x", "kubectl get -n ns pods p -o wide", "kubectl exec -n ns -it p -- sh"},
-		{"x", "kubectl logs --context c -n ns p -f", "kubectl exec --context c -n ns -it p -- sh"},
+		{"x", "kubectl logs --context c -n ns p -f", "kubectl --context c exec -n ns -it p -- sh"},
 		{"x", "kubectl describe pod/p", "kubectl exec -it p -- sh"},
 		{"x", "kubectl get pods", ""},
 		{"x", "kubectl get deploy d", ""},
 		{"X", "kubectl get pods p", ""},
 		// overview: the type's full list across namespaces, wide, in kview, from any kubectl line.
 		{"o", "kubectl logs -n ns -f p --tail 5", "kview kubectl get pods -A -o wide"},
-		{"o", "kubectl get deploy/d -o yaml --context c", "kview kubectl get --context c deploy -A -o wide"},
+		{"o", "kubectl get deploy/d -o yaml --context c", "kview kubectl --context c get deploy -A -o wide"},
 		{"o", "kubectl get pods -A -l app=x -w", "kview kubectl get pods -A -o wide"},
-		{"o", "kubectl get -n ns pods -l app=x,tier=y --field-selector a=b --sort-by .x --show-labels --context c",
-			"kview kubectl get --context c pods -A -o wide"},
+		{"o", "kubectl --context c get -n ns pods -l app=x,tier=y --field-selector a=b --sort-by .x --show-labels",
+			"kview kubectl --context c get pods -A -o wide"},
 		{"o", "kubectl logs -l app=x --kubeconfig k --as u -f", "kview kubectl get --kubeconfig k --as u pods -A -o wide"},
 		{"o", "kubectl get -f x.yaml", "kview kubectl get pods -A -o wide"},
 		{"o", "kubectl describe svc s -n ns", "kview kubectl get svc -A -o wide"},
@@ -143,7 +143,7 @@ func TestToggle(t *testing.T) {
 		// -A on a named resource: kubectl refuses names across namespaces, so the names and -n go.
 		{"a", "kubectl get -n ns pods p -o wide", "kubectl get -o wide pods -A"},
 		{"a", "kubectl get -n ns deploy/d", "kubectl get deploy -A"},
-		{"a", "kubectl get -n ns pods a b --context c", "kubectl get --context c pods -A"},
+		{"a", "kubectl get -n ns pods a b --context c", "kubectl --context c get pods -A"},
 		{"a", "kview kubectl get -n ns pods p", "kview kubectl get pods -A"},
 		{"a", "kubectl get -n ns pods", "kubectl get -n ns pods -A"},
 		{"w", "kview kubectl get pods", "kview kubectl get pods -w"},
@@ -181,9 +181,15 @@ func TestExecShell(t *testing.T) {
 		out, ok := run("b", true, strings.Fields(c.in))
 		check(t, "b", c.in, c.want, out, ok)
 	}
-	if out, ok := up(strings.Fields("kubectl exec --context c -n ns -it p -- sh")); !ok ||
-		strings.Join(out, " ") != "kubectl get --context c -n ns pod p" {
-		t.Errorf("exec up: %q", out)
+	for in, want := range map[string]string{
+		"kubectl exec --context c -n ns -it p -- sh": "kubectl --context c get -n ns pod p",
+		// naming no pod: up to the pods list where it looks
+		"kubectl exec --context c -n tools -h":                   "kubectl --context c get -n tools pods",
+		"kubectl exec --context c -n tools -it -l app=web": "kubectl --context c get -n tools pods",
+	} {
+		if out, ok := up(strings.Fields(in)); !ok || strings.Join(out, " ") != want {
+			t.Errorf("exec up from %q: got %q, want %q", in, out, want)
+		}
 	}
 }
 
@@ -194,7 +200,7 @@ func TestPick(t *testing.T) {
 		{"kubectl get pods -A -o wide", "kube-system  coredns-x  1/1  Running  0  2d  10.0.0.1",
 			"kubectl get -n kube-system pods coredns-x"},
 		{"kubectl get --context c deploy -A -o wide", "ns d 1/1 1 1 5d",
-			"kubectl get --context c -n ns deploy d"},
+			"kubectl --context c get -n ns deploy d"},
 		{"kubectl get -n ns pods -o wide -w", "p 1/1 Running", "kubectl get -n ns pods p"},
 		{"kubectl get pods -A --sort-by=.metadata.creationTimestamp", "ns p 1/1", "kubectl get -n ns pods p"},
 		// a list reached by labels: kubectl rejects a name alongside a selector.
@@ -217,7 +223,7 @@ func TestSelect(t *testing.T) {
 		{"kubectl get pods -A -o wide", "kube-system coredns-x 1/1 Running", "k8s-app=kube-dns tier=node",
 			"kubectl get -n kube-system pods -l k8s-app=kube-dns,tier=node"},
 		{"kubectl get --context c -l old=1 deploy -A", "ns d 1/1", "app=d",
-			"kubectl get --context c -n ns deploy -l app=d"},
+			"kubectl --context c get -n ns deploy -l app=d"},
 		{"kubectl get -n ns pods", "p 1/1 Running", "app=x", "kubectl get -n ns pods -l app=x"},
 		{"kubectl get all -A", "ns pod/p 1/1", "app=x", "kubectl get -n ns pod -l app=x"},
 		{"kubectl get pods -A", "ns p", "", ""},
@@ -272,7 +278,7 @@ func TestUp(t *testing.T) {
 		in, want string // want "" means a top menu
 	}{
 		{"kubectl rollout restart -n ns deploy/d", "kubectl get -n ns deploy/d"},
-		{"kubectl rollout status deploy/a deploy/b --context c", "kubectl get --context c deploy/a deploy/b"},
+		{"kubectl rollout status deploy/a deploy/b --context c", "kubectl --context c get deploy/a deploy/b"},
 		{"kubectl scale -n ns deploy/d --replicas=3", "kubectl get -n ns deploy/d"},
 		{"kubectl logs -n ns p -f --tail 5", "kubectl get -n ns pod p"},
 		{"kubectl logs -n ns deploy/d", "kubectl get -n ns deploy/d"},

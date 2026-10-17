@@ -8,8 +8,8 @@ import (
 func TestSetContext(t *testing.T) {
 	cases := []struct{ name, in, want string }{
 		{"prod", "kubectl get -n ns pods", "kubectl --context prod get -n ns pods"},
-		{"prod", "kubectl get pods --context test -o wide", "kubectl get pods --context prod -o wide"},
-		{"prod", "kubectl logs --context=test p", "kubectl logs --context prod p"},
+		{"prod", "kubectl get pods --context test -o wide", "kubectl --context prod get pods -o wide"},
+		{"prod", "kubectl logs --context=test p", "kubectl --context prod logs p"},
 		{"prod", "kview -c STATUS kubectl get pods -A", "kview -c STATUS kubectl --context prod get pods -A"},
 		{"prod", "kubectl -n ns", "kubectl --context prod -n ns"},
 		{"prod", "ls", ""},

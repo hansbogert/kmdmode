@@ -44,7 +44,7 @@ func TestOwner(t *testing.T) {
 
 	cases := []struct{ in, want string }{
 		{"kubectl get -n ns pods web-7d9f8-x2k -o wide", "kubectl get -n ns deploy/web"},
-		{"kubectl logs --context c -n ns db-0 -f", "kubectl get --context c -n ns sts/db"},
+		{"kubectl logs --context c -n ns db-0 -f", "kubectl --context c get -n ns sts/db"},
 		{"kubectl describe -n ns pod/backup-29-abcd", "kubectl get -n ns cronjob/backup"},
 		{"kubectl get pods solo-x", "kubectl get rs/solo"},
 		{"kubectl get -n clickhouse secrets ch", "kubectl get -n clickhouse clickhousecluster.clickhouse.com/analytics"},

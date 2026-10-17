@@ -198,11 +198,19 @@ func (k kubectlCmd) value(f kflag) string {
 	return strings.TrimPrefix(w[2:], "=")
 }
 
-// rebuild turns the command into "argv0 sub <flags> args...", keeping each flag the target
-// subcommand also has. A short form that means something else there is spelled out in full.
+// rebuild turns the command into "argv0 [--context X] sub <flags> args...", keeping each flag the
+// target subcommand also has; --context leads, so the cluster reads first. A short form that
+// means something else there is spelled out in full.
 func (k kubectlCmd) rebuild(sub string, args ...string) []string {
-	out := []string{k.words[0], sub}
+	out := []string{k.words[0]}
+	if f, ok := k.find("--context"); ok {
+		out = append(out, "--context", k.value(f))
+	}
+	out = append(out, sub)
 	for _, f := range k.flags {
+		if f.long == "--context" {
+			continue
+		}
 		if _, takesValue, ok := lookup(sub, f.long); ok {
 			w := k.words[f.start]
 			if short := w[:2]; !strings.HasPrefix(w, "--") {
@@ -366,13 +374,26 @@ func (k kubectlCmd) retype(typ string) []string {
 	return k.rebuild("get", typ)
 }
 
-// withContext sets --context name, replacing the line's own or adding it after kubectl, where every
-// subcommand takes it.
+// withContext sets --context name right after kubectl, where every subcommand takes it and the
+// cluster reads first, dropping the line's own from wherever it was.
 func (k kubectlCmd) withContext(name string) []string {
+	words := k.words
 	if f, ok := k.find("--context"); ok {
-		return k.splice(f.start, f.end, []string{"--context", name})
+		words = k.splice(f.start, f.end, nil)
 	}
-	return k.splice(1, 1, []string{"--context", name})
+	return append([]string{words[0], "--context", name}, words[1:]...)
+}
+
+// nonGlobalLongs lists the long names of the line's flags that are not global (cluster, identity,
+// namespace) ones.
+func (k kubectlCmd) nonGlobalLongs() []string {
+	var longs []string
+	for _, f := range k.flags {
+		if _, _, global := lookup("", f.long); !global {
+			longs = append(longs, f.long)
+		}
+	}
+	return longs
 }
 
 // clusterFlags returns the line's global flags (cluster, identity, namespace), unquoted for exec.
@@ -435,10 +456,14 @@ func (k kubectlCmd) parent() func() []string {
 		}
 		args = refs
 	case "exec":
-		if len(k.pos) == 0 {
-			return nil
+		// Up to the pod it names, or, naming none (exec -h, a misplaced -l), the pods list where
+		// it looks. An "=" word is no pod name: exec has no -l, so a selector's value lands here.
+		if len(k.pos) == 0 || strings.Contains(k.pos[0], "=") {
+			k = k.without(k.nonGlobalLongs()...)
+			args = []string{"pods"}
+		} else {
+			args = []string{"pod", k.pos[0]}
 		}
-		args = []string{"pod", k.pos[0]}
 	default:
 		return nil
 	}

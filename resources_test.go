@@ -8,7 +8,7 @@ import (
 func TestRetype(t *testing.T) {
 	cases := []struct{ typ, in, want string }{
 		{"c", "kubectl get -n ns pods -l app=x -o wide", "kubectl get -n ns -o wide configmaps"},
-		{"e", "kubectl logs --context c -n ns p -f", "kubectl get --context c -n ns secrets"},
+		{"e", "kubectl logs --context c -n ns p -f", "kubectl --context c get -n ns secrets"},
 		{"E", "kubectl get -n ns pods", ""}, // keys are case-sensitive: E is no type
 		{"s", "kubectl get pods -A --sort-by .x", "kubectl get -A statefulsets"},
 		{"a", "kubectl rollout restart -n ns deploy/d", "kubectl get -n ns daemonsets"},
