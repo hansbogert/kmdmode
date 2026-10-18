@@ -1,24 +1,72 @@
 # cmdmode: press $CMDMODE_KEY (default Alt-m) to enter a modal keymap that rewrites the current
 # command line, e.g. "kubectl get pods -n ns pod1" then L gives "kubectl logs -n ns pod1".
-# The message line names the mode ("kubectl get"); "-" lists that mode's flags to toggle, ":"
-# switches the resource type it lists.
+# The hint below the line names the mode ("kubectl get"); "-" lists that mode's flags to toggle,
+# ":" switches the resource type it lists. The verb, and the actions that change it, show in cyan.
 # The rewrite rules live in the Go helper; this file only owns the keymap and the buffer.
 
 typeset -g _cmdmode_bin=${CMDMODE_BIN:-${0:A:h}/bin/cmdmode}
 [[ -x $_cmdmode_bin ]] || _cmdmode_bin=cmdmode
 typeset -g _cmdmode_prev_keymap=main
 typeset -g _cmdmode_sub=  # the submenu shown: "options" ("-"), "resources" (":"), or none
+typeset -gi _cmdmode_shift=0  # words a leading alias added (see _cmdmode_words)
 
-# Fills $words from the buffer, expanding a leading alias so "kgp pod1" reads as kubectl.
+# Fills $words from the buffer, expanding a leading alias so "kgp pod1" reads as kubectl;
+# _cmdmode_shift is how many words that added, to map a word back to the buffer.
 _cmdmode_words() {
   words=(${(z)BUFFER})
-  (( $#words )) && (( $+aliases[$words[1]] )) && words=(${(z)aliases[$words[1]]} "${(@)words[2,-1]}")
+  _cmdmode_shift=0
+  if (( $#words )) && (( $+aliases[$words[1]] )); then
+    local -a expansion=(${(z)aliases[$words[1]]})
+    _cmdmode_shift=$(( $#expansion - 1 ))
+    words=($expansion "${(@)words[2,-1]}")
+  fi
+}
+
+# Draws $1 below the command line (POSTDISPLAY) rather than as a zle -M message: zle knows its
+# width, and it can be coloured. The other arguments are "start end" character ranges of $1 to
+# show in cyan. region_highlight counts POSTDISPLAY on from the end of BUFFER ("P" would mean
+# counting from PREDISPLAY, not into POSTDISPLAY); the +1 is the newline.
+_cmdmode_show() {
+  local text=$1 r base=$(( $#BUFFER + 1 ))
+  shift
+  _cmdmode_clear
+  POSTDISPLAY=$'\n'$text
+  for r in "$@"; do
+    region_highlight+=("$(( base + ${r% *} )) $(( base + ${r#* } )) fg=cyan,memo=cmdmode")
+  done
+}
+
+# Removes the hint and the colours; also on leaving the line, so neither stays in the scrollback.
+_cmdmode_clear() {
+  POSTDISPLAY=
+  region_highlight=(${region_highlight:#*memo=cmdmode*})
+}
+
+# A short note while something takes a moment, drawn where the hint is.
+_cmdmode_note() {
+  _cmdmode_show "cmdmode: $1"
+  zle -R
+}
+
+# Colours the buffer's word number $1 (0-based, in $words, as the helper counts) cyan: the verb.
+# A verb inside an expanded alias ("kgp") is not in the buffer, so it stays uncoloured.
+_cmdmode_color_verb() {
+  local -a tokens=(${(z)BUFFER})
+  local n=$(( $1 + 1 - _cmdmode_shift )) i pos=0 tok
+  (( n >= 1 && n <= $#tokens && (_cmdmode_shift == 0 || n > 1) )) || return
+  for (( i = 1; i <= n; i++ )); do
+    tok=$tokens[i]
+    while [[ ${BUFFER[pos+1]} == [[:space:]] ]]; do (( pos++ )); done
+    [[ ${BUFFER[pos+1,pos+$#tok]} == "$tok" ]] || return
+    (( i < n )) && (( pos += $#tok ))
+  done
+  region_highlight+=("$pos $(( pos + $#tok )) fg=cyan,memo=cmdmode")
 }
 
 _cmdmode_leave() {
   zle -K $_cmdmode_prev_keymap
   _cmdmode_sub=
-  zle -M ''
+  _cmdmode_clear
 }
 
 # Shows the current mode's keys, prefixed by an optional note in $1. Kept to one terminal line:
@@ -30,20 +78,24 @@ _cmdmode_render() {
   _cmdmode_words
   lines=(${(f)"$("$_cmdmode_bin" menu -- "${words[@]}")"})
   if (( ! $#lines )); then
-    # One message only: clearing it (as _cmdmode_leave does) and then setting it again in the
-    # same keypress shifts the prompt up a row on screen.
-    zle -K $_cmdmode_prev_keymap
-    _cmdmode_sub=
-    [[ $2 == quiet ]] && zle -M '' || zle -M "cmdmode: no actions for this line"
+    # One message only: clearing it and then setting it again in the same keypress shifts the
+    # prompt up a row on screen.
+    _cmdmode_leave
+    [[ $2 == quiet ]] || zle -M "cmdmode: no actions for this line"
     return 1
   fi
-  local name msg line has_options= has_resources= has_up=
+  local name msg line verb= has_options= has_resources= has_up=
+  local -a cyan
   for line in $lines; do
     f=("${(@ps:\t:)line}")
     case $f[1] in
       mode) name=$f[2] ;;
       up) has_up=1 ;;
-      action) [[ -z $_cmdmode_sub ]] && msg+="  [$f[2]] $f[3]" ;;
+      verb) verb=$f[2] ;;
+      action)
+        [[ -z $_cmdmode_sub ]] || continue
+        [[ $f[4] == verb ]] && cyan+=("$(( $#msg + 2 )) $(( $#msg + 5 + $#f[2] + $#f[3] ))")
+        msg+="  [$f[2]] $f[3]" ;;
       option)
         has_options=1
         [[ $_cmdmode_sub == options ]] && msg+="  [$f[2]] $f[3]${${f[4]:#off}:+*}" ;;
@@ -52,17 +104,34 @@ _cmdmode_render() {
         [[ $_cmdmode_sub == resources ]] && msg+="  [$f[2]] $f[3]" ;;
     esac
   done
-  local esc=exit tail
+  local esc=exit tail head="${1}cmdmode [$name"
+  local -a ranges
   [[ -n $has_up ]] && esc=up
+  # The mode's verb is the last word of its name, unless that is kubectl itself (no verb).
+  [[ $name == *\ * && ${name##* } != kubectl ]] && ranges=("$(( $#head - ${#${name##* }} )) $#head")
   case $_cmdmode_sub in
-    options) msg="${1}cmdmode [$name -]${msg}" tail="  [Esc] up" ;;
-    resources) msg="${1}cmdmode [$name :]${msg}" tail="  [Esc] up" ;;
-    *) msg="${1}cmdmode [$name]${msg}"
+    options) head+=" -]" tail="  [Esc] up" ;;
+    resources) head+=" :]" tail="  [Esc] up" ;;
+    *) head+="]"
        tail="${has_options:+  [-] options}${has_resources:+  [:] resource}  [Esc] $esc" ;;
   esac
-  # When too wide, cut the list rather than the keys that always apply.
-  (( $#msg + $#tail < COLUMNS )) || msg="${msg[1,COLUMNS-$#tail-2]}…"
-  zle -M "$msg$tail"
+  local r
+  for r in $cyan; do  # counted within the list; shift them past the head
+    ranges+=("$(( ${r% *} + $#head )) $(( ${r#* } + $#head ))")
+  done
+  msg=$head$msg
+  # When too wide, cut the list rather than the keys that always apply; colours stop at the cut.
+  if (( $#msg + $#tail >= COLUMNS )); then
+    local cut=$(( COLUMNS - $#tail - 2 ))
+    local -a kept
+    msg="${msg[1,cut]}…"
+    for r in $ranges; do
+      (( ${r% *} < cut )) && kept+=("${r% *} $(( ${r#* } < cut ? ${r#* } : cut ))")
+    done
+    ranges=($kept)
+  fi
+  _cmdmode_show "$msg$tail" $ranges
+  [[ -n $verb ]] && _cmdmode_color_verb $verb
 }
 
 # On an empty prompt, Alt-m starts from the most recent command in history that has a mode, so
@@ -97,6 +166,7 @@ _cmdmode_enter() {
     if [[ ${(f)"$("$_cmdmode_bin" menu -- "${words[@]}")"} == *nocontext* ]]; then
       local out
       if ! _cmdmode_pick_context; then
+        _cmdmode_clear
         zle -M "cmdmode: pick a context to start; Esc cancelled"
         return
       fi
@@ -146,9 +216,8 @@ _cmdmode_dispatch() {
     fi
     return
   fi
-  if [[ -z $_cmdmode_sub && $KEYS == u ]]; then  # U asks the cluster: say so while it does
-    zle -M "cmdmode: asking the cluster for the owner…"
-    zle -R
+  if [[ -z $_cmdmode_sub && $KEYS == u ]]; then  # u asks the cluster: say so while it does
+    _cmdmode_note "asking the cluster for the owner…"
   fi
   if out=$("$_cmdmode_bin" ${${_cmdmode_sub:+toggle}:-apply} "$KEYS" -- "${words[@]}"); then
     if [[ $out == *= ]]; then
@@ -176,9 +245,10 @@ _cmdmode_dispatch() {
 _cmdmode_pick_resource() {
   local fzf=${_cmdmode_bin:h}/fzf types typ
   [[ -x $fzf ]] || fzf=fzf
-  zle -M "cmdmode: asking the cluster for its resource types…"
-  zle -R
+  _cmdmode_note "asking the cluster for its resource types…"
   types=$("$_cmdmode_bin" api-resources -- "${words[@]}") || return 1
+  _cmdmode_clear  # fzf draws where the hint was
+  zle -R
   typ=$(print -r -- $types | $fzf --height=40% --layout=reverse --prompt="resource > " \
     --header="enter: list it  esc: cancel")
   zle reset-prompt
@@ -193,6 +263,8 @@ _cmdmode_pick_context() {
   local -a lines
   [[ -x $fzf ]] || fzf=fzf
   lines=(${(f)"$("$_cmdmode_bin" contexts -- "${words[@]}")"}) || return 1
+  _cmdmode_clear  # fzf draws where the hint was
+  zle -R
   # The one in use first, so keeping it is a single Enter.
   ctx=$(print -rl -- ${lines[1]} ${${lines[2,-1]}:#${lines[1]}} |
     $fzf --height=40% --layout=reverse --prompt="context > " \
@@ -231,8 +303,7 @@ _cmdmode_run() {
   local -a lines=(${(f)"$("$_cmdmode_bin" menu -- "${words[@]}")"})
   if [[ $lines[1] == $'mode\tkubectl delete' ]]; then
     local key
-    zle -M "cmdmode: delete? press Y (capital) to run it, any other key cancels"
-    zle -R
+    _cmdmode_note "delete? press Y (capital) to run it, any other key cancels"
     read -k 1 key
     if [[ $key != Y ]]; then
       _cmdmode_render "not deleted; "
@@ -261,6 +332,10 @@ _cmdmode_precmd() {
   _cmdmode_rerun=
 }
 
+_cmdmode_line_finish() {
+  _cmdmode_clear
+}
+
 _cmdmode_line_init() {
   _cmdmode_returned=
   [[ -n $_cmdmode_picked ]] || return
@@ -272,6 +347,7 @@ _cmdmode_line_init() {
 autoload -Uz add-zsh-hook add-zle-hook-widget
 add-zsh-hook precmd _cmdmode_precmd
 add-zle-hook-widget line-init _cmdmode_line_init
+add-zle-hook-widget line-finish _cmdmode_line_finish
 
 zle -N cmdmode-enter _cmdmode_enter
 zle -N cmdmode-dispatch _cmdmode_dispatch

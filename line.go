@@ -18,7 +18,12 @@ type mode struct {
 	// context sets the line's --context (C); currentContext is the one it names, if any.
 	context        func(name string) []string
 	currentContext string
+	verbAt         int // index of the subcommand word in the command, -1 without one
 }
+
+// Keys of the actions that change the line's verb (logs, get, describe, delete, exec, rollout
+// restart, scale, rollout status), which the hint shows in cyan like the verb itself.
+var verbKeys = set("l", "g", "i", "d", "x", "r", "s", "t")
 
 type action struct {
 	key   string
@@ -57,6 +62,10 @@ func kviewMode(prefix, cmd []string) (mode, bool) {
 	m.up = func() []string { return cmd }
 	m.cluster = inner.cluster
 	m.currentContext = inner.currentContext
+	m.verbAt = -1
+	if inner.verbAt >= 0 {
+		m.verbAt = len(prefix) + inner.verbAt
+	}
 	m.context = func(name string) []string { return append(slices.Clone(prefix), inner.context(name)...) }
 	if inner.retype != nil { // stays watched; -c goes, as columns differ per type
 		m.retype = func(typ string) []string { return append([]string{"kview"}, inner.retype(typ)...) }
@@ -121,6 +130,15 @@ func spliceTarget(words []string, rewrite func(mode) []string) ([]string, bool) 
 	out := append([]string{}, words[:start]...)
 	out = append(out, res...)
 	return append(out, words[start+len(cmd):]...), true
+}
+
+// verbWord returns the index in words of the target command's verb (its subcommand word).
+func verbWord(words []string) (int, bool) {
+	start, _, m, ok := target(words)
+	if !ok || m.verbAt < 0 {
+		return 0, false
+	}
+	return start + m.verbAt, true
 }
 
 // modeFor returns the mode of the command line's target command.

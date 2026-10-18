@@ -193,6 +193,26 @@ func TestExecShell(t *testing.T) {
 	}
 }
 
+func TestVerbWord(t *testing.T) {
+	for in, want := range map[string]int{
+		"kubectl get pods":                             1,
+		"kubectl --context c -n ns logs p":             5,
+		"KUBECONFIG=x kubectl get pods | less":         2,
+		"cd /tmp && kubectl describe pod p":            4,
+		"kview -c STATUS kubectl --context c get pods": 6,
+		"kview kubectl get pods":                       2,
+		"kubectl -n ns":                                -1,
+	} {
+		i, ok := verbWord(strings.Fields(in))
+		if !ok {
+			i = -1
+		}
+		if i != want {
+			t.Errorf("%q: verb at %d, want %d", in, i, want)
+		}
+	}
+}
+
 func TestPick(t *testing.T) {
 	cases := []struct {
 		cmd, row, want string

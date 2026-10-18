@@ -29,6 +29,12 @@ With no kubectl command in recent history, it starts from the pods overview, as 
 the line's cluster serves (`kubectl api-resources`, so built-ins and every CRD the apiextensions API
 registered, qualified like `certificates.cert-manager.io`). On a `kview` line it stays watched.
 
+**Colours.** In cmdmode the line's verb (`get`, `logs`, ...) shows in cyan, and so do the actions
+in the hint that change it (`l` logs, `g` get, `i` describe, `d` delete, `x` exec, `r` restart,
+`s` scale, `t` status). The hint is drawn below the line as part of zle's display
+(`POSTDISPLAY`), not as a `zle -M` message, which can't be coloured; it is cleared when the line is
+run or left, so it doesn't stay in the scrollback.
+
 **Context first.** When the line names no `--context`, entering cmdmode opens the context picker
 before anything else, so nothing acts on whatever context the kubeconfig happens to point at. The
 current one is listed first (one Enter keeps it, now explicit on the line); Esc there leaves cmdmode

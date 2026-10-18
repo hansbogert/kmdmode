@@ -112,11 +112,12 @@ type kflag struct {
 }
 
 type kubectlCmd struct {
-	words []string
-	sub   string
-	flags []kflag
-	pos   []string // positional args after the subcommand
-	end   int      // where new flags go: before "--", else the end
+	words  []string
+	sub    string
+	subIdx int // index of the subcommand word in words
+	flags  []kflag
+	pos    []string // positional args after the subcommand
+	end    int      // where new flags go: before "--", else the end
 }
 
 // lookup resolves a flag word to its long name using the subcommand's table, then the global one,
@@ -159,7 +160,7 @@ func parseKubectl(cmd []string) (kubectlCmd, bool) {
 			}
 			k.flags = append(k.flags, f)
 		case k.sub == "":
-			k.sub = bare(w)
+			k.sub, k.subIdx = bare(w), i
 			if !subcommand.MatchString(k.sub) { // e.g. "kubectl() {", a function definition
 				return kubectlCmd{}, false
 			}
@@ -318,6 +319,10 @@ func kubectlMode(cmd []string) (mode, bool) {
 		}})
 	}
 	m.up = k.parent()
+	m.verbAt = -1
+	if k.sub != "" {
+		m.verbAt = k.subIdx
+	}
 	if pod, ok := k.namedPod(); ok {
 		m.actions = append(m.actions, action{"x", "exec", func() []string {
 			return k.without("--output").rebuild("exec", "-it", pod, "--", "sh")

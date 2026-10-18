@@ -7,26 +7,32 @@ root=${0:A:h}
 out=$(mktemp)
 fail=0
 
-check() {  # check LINE KEYS WANT [TEXT the terminal must show]
+# The terminal output without colour codes: the hint colours its verbs, which splits the text.
+plain() { print -r -- "$1" | sed 's/\x1b\[[0-9;]*m//g' }
+
+check() {  # check LINE KEYS WANT [TEXT the hint (or a message) must show]
   local line=$1 keys=$2 want=$3 shows=$4
-  : >| $out
+  : >| $out; : >| $out.hint
   zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
   zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; alias kgp='kubectl get pods'"
-  zpty -w t "_dump() { [[ -n \$BUFFER ]] && print -rn -- \$BUFFER >| $out }; zle -N _dump"
-  zpty -w t "bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
+  # The hint is POSTDISPLAY, which zle redraws incrementally, so dump it rather than read it off
+  # the terminal.
+  zpty -w t "_dump() { print -rn -- \$POSTDISPLAY >| $out.hint; [[ -n \$BUFFER ]] && print -rn -- \$BUFFER >| $out }"
+  zpty -w t "zle -N _dump; bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
   zpty -w t "kubectl() { print -rn -- \"ran: kubectl \$*\" >| $out }"
   zpty -w -n t "$line"$'\em'"$keys"$'\x14'
   local i tty chunk
   for i in {1..50}; do [[ -s $out ]] && break; sleep 0.05; done
   while zpty -rt t chunk; do tty+=$chunk; done
+  tty=$(plain $tty)
   zpty -d t
   local name="${(q)line} + ${(q)keys}"
   if [[ $(<$out) != "$want" ]]; then
     print "FAIL $name: got ${(q)$(<$out)}, want ${(q)want}"; fail=1
   elif [[ $tty == *(bad option|command not found|_cmdmode)* ]]; then
     print "FAIL $name: zsh error on the terminal: ${(q)tty}"; fail=1
-  elif [[ -n $shows && $tty != *"$shows"* ]]; then
-    print "FAIL $name: terminal never showed ${(q)shows}"; fail=1
+  elif [[ -n $shows && $tty != *"$shows"* && $(<$out.hint) != *"$shows"* ]]; then
+    print "FAIL $name: never showed ${(q)shows}; hint was ${(q)$(<$out.hint)}"; fail=1
   else
     print "ok   $name"
   fi
@@ -43,12 +49,14 @@ check 'kgp pod1' l 'kubectl logs pod1'
 check 'kubectl get pods p' $'\e'x 'kubectl get pods px'
 check 'kubectl get pods p' 'l-ft' 'kubectl logs p -f --timestamps' '[f] -f*'
 check "kubectl get pods p" "l-f" "kubectl logs p -f" "[f] -f*  [p]"
-check 'kubectl logs -f p' '-f'$'\e''g' 'kubectl get pod p' 'cmdmode [kubectl logs -]'
+check 'kubectl logs -f p' '-' 'kubectl logs -f p' 'cmdmode [kubectl logs -]'
+check 'kubectl logs -f p' '-f'$'\e''g' 'kubectl get pod p'
 check 'kubectl -n ns ' o 'kview kubectl get pods -A -o wide ' 'cmdmode [kubectl]  [o] overview'
 check 'kubectl -n ns ' o 'kview kubectl get pods -A -o wide ' 'cmdmode [kview kubectl get]  [w] unwatch'
 check 'kubectl -n ns ' ow 'kubectl get pods -A -o wide '
 check 'kubectl -n ns ' $'o\e' 'kubectl get pods -A -o wide' '[Esc] up'  # watching is a menu below
-check 'kubectl get -n ns pods p -o wide' ':c' 'kubectl get -n ns -o wide configmaps' 'cmdmode [kubectl get :]  [p] pods'
+check 'kubectl get -n ns pods p -o wide' ':' 'kubectl get -n ns pods p -o wide' 'cmdmode [kubectl get :]  [p] pods'
+check 'kubectl get -n ns pods p -o wide' ':c' 'kubectl get -n ns -o wide configmaps'
 check 'kubectl get -n ns pods p' $':\e' 'kubectl get -n ns pods p'  # Esc leaves the resource list
 check 'kubectl get -n ns pods p -o wide' '-a' 'kubectl get -o wide pods -A'  # -A drops names and -n
 check 'kubectl get deploy d -n ns' r 'kubectl rollout restart -n ns deploy/d' 'cmdmode [kubectl rollout]'
@@ -198,6 +206,7 @@ drain 6
 zpty -w -n t $'\em'
 local screen chunk
 repeat 10 { while zpty -rt t chunk; do screen+=$chunk; done; sleep 0.05 }
+screen=$(plain $screen)
 zpty -w -n t $'\x14'
 for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
 zpty -d t
@@ -462,6 +471,7 @@ for keys ran in Y 'delete -n ns pods p' y ''; do
   repeat 6 { while zpty -rt t chunk; do asked+=$chunk; done; sleep 0.05 }
   zpty -w -n t $keys
   repeat 10 { while zpty -rt t chunk; do screen+=$chunk; done; sleep 0.05 }
+  asked=$(plain $asked) screen=$(plain $screen)
   zpty -d t
   got=; [[ -e $out.ran ]] && got=$(<$out.ran)
   if [[ $asked == *"press Y (capital)"* && $got == "$ran" && ( -n $ran || $screen == *"not deleted"* ) ]]; then
@@ -471,5 +481,5 @@ for keys ran in Y 'delete -n ns pods p' y ''; do
   fi
 done
 
-rm -rf $out $out.ran $kv $fake
+rm -rf $out $out.ran $out.hint $kv $fake
 exit $fail

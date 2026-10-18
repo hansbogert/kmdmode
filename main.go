@@ -6,7 +6,8 @@
 //	cmdmode menu -- WORD...        print the mode and its actions and options, tab-separated:
 //	                               "mode NAME", "action KEY LABEL", "option KEY LABEL on|off",
 //	                               "up" when it has a parent menu, "nocontext" when the line
-//	                               names no --context
+//	                               names no --context, "verb IDX" for the index of the verb word;
+//	                               actions that change the verb end in a "verb" field
 //	cmdmode apply KEY -- WORD...   print the line after action KEY; exit 1 if it does not apply
 //	cmdmode toggle KEY -- WORD...  print the line after toggling option KEY; exit 1 likewise
 //	cmdmode up -- WORD...          print the line of the parent menu; exit 1 at a top menu
@@ -38,7 +39,14 @@ func main() {
 		}
 		fmt.Printf("mode\t%s\n", m.name)
 		for _, a := range m.actions {
-			fmt.Printf("action\t%s\t%s\n", a.key, a.label)
+			if verbKeys[a.key] {
+				fmt.Printf("action\t%s\t%s\tverb\n", a.key, a.label)
+			} else {
+				fmt.Printf("action\t%s\t%s\n", a.key, a.label)
+			}
+		}
+		if i, ok := verbWord(args[2:]); ok {
+			fmt.Printf("verb\t%d\n", i)
 		}
 		for _, o := range m.options {
 			fmt.Printf("option\t%s\t%s\t%s\n", o.key, o.label, map[bool]string{true: "on", false: "off"}[o.on])
