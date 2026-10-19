@@ -50,6 +50,9 @@ headed by the one the line uses now, and sets `--context NAME` on the line: repl
 added right after `kubectl`. Only the line changes, not the kubeconfig's current context, so other
 terminals are unaffected. On a `kview` line it goes into the watched command.
 
+**Tab** completes as it does outside cmdmode (through whatever your normal keymap binds Tab to,
+e.g. fzf's or fzf-tab's completion) and then shows the menu for the completed line.
+
 **Esc** goes up one menu: out of the option list (toggles kept), then from an action's menu
 (`logs`, `rollout`, `scale`, `describe`, `delete`) to the get menu of the resource it acts on,
 e.g. `kubectl rollout restart -n ns deploy/d` up to `kubectl get -n ns deploy/d`, and from a

@@ -44,6 +44,7 @@ check 'kubectl get deploy d -n ns' i 'kubectl describe -n ns deploy d' 'cmdmode 
 check 'kubectl get deploy d' l 'kubectl get deploy d' "no 'l' here"
 check 'kubectl get pods p' L 'kubectl get pods p' "no 'L' here"  # keys are case-sensitive
 check 'kubectl get -n ns pods p' x 'kubectl exec -n ns -it p -- sh' 'cmdmode [kubectl exec]'
+check 'kubectl get -f /us' $'\t' 'kubectl get -f /usr/' 'cmdmode [kubectl get]'  # Tab completes, still in cmdmode
 check 'kubectl get -n ns pods p' 'x-b' 'kubectl exec -n ns -it p -- bash' '[b] bash*'
 check 'kgp pod1' l 'kubectl logs pod1'
 check 'kubectl get pods p' $'\e'x 'kubectl get pods px'

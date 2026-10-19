@@ -274,6 +274,15 @@ _cmdmode_pick_context() {
   [[ -n $ctx ]]
 }
 
+# Tab completes as it does outside cmdmode, through whatever the keymap cmdmode came from binds
+# it to (fzf's or fzf-tab's completion here), then shows the menu for the completed line.
+_cmdmode_complete() {
+  local widget=${${(z)"$(bindkey -M $_cmdmode_prev_keymap '^I')"}[2]}
+  _cmdmode_clear  # completion lists and pickers draw where the hint was
+  zle ${widget:-expand-or-complete}
+  _cmdmode_render "" quiet
+}
+
 # Esc goes up one menu: out of the option or resource list (toggles kept), then from an action's
 # menu (logs, rollout, scale, describe, delete) to the get menu of the resource it acts on, then,
 # at a top menu, out of cmdmode.
@@ -354,10 +363,12 @@ zle -N cmdmode-dispatch _cmdmode_dispatch
 zle -N cmdmode-escape _cmdmode_escape
 zle -N cmdmode-leave _cmdmode_leave
 zle -N cmdmode-run _cmdmode_run
+zle -N cmdmode-complete _cmdmode_complete
 
 bindkey -N cmdmode
 bindkey -M cmdmode -R ' '-'~' cmdmode-dispatch
 bindkey -M cmdmode '^[' cmdmode-escape '^M' cmdmode-run '^J' cmdmode-run '^G' cmdmode-leave
+bindkey -M cmdmode '^I' cmdmode-complete
 # Arrow keys are bound explicitly so their escape sequences leave whole, not as Esc + "[A".
 local _k
 for _k in '^[[A' '^[[B' '^[[C' '^[[D' '^[OA' '^[OB' '^[OC' '^[OD'; do
