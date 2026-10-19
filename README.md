@@ -42,7 +42,7 @@ with the line untouched. Lines cmdmode hands back carry the context along, so th
 flow. `CMDMODE_CONTEXT_FIRST=0` turns it off.
 
 **x** (exec) on a line naming one pod gives `kubectl exec -it -n NS POD -- sh`, staying in cmdmode
-on the exec line: its option **b** switches the shell to bash and back (sh is the default; nearly
+on the exec line: **b** there (shown as `[b] bash` or `[b] sh`) switches the shell to bash and back (sh is the default; nearly
 every image has it, many lack bash), Enter runs it, and Esc goes up to the pod's get.
 
 **C** (capital only; lowercase `c` is not it) picks a kubeconfig context in fzf below the prompt,

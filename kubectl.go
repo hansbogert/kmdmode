@@ -329,8 +329,8 @@ func kubectlMode(cmd []string) (mode, bool) {
 		}})
 	}
 	if k.sub == "exec" {
-		if opt, ok := k.shellOption(); ok {
-			m.options = append(m.options, opt)
+		if a, ok := k.shellAction(); ok {
+			m.actions = append(m.actions, a)
 		}
 	}
 	m.retype = k.retype
@@ -422,18 +422,19 @@ func (k kubectlCmd) namedPod() (string, bool) {
 	return name, ok && podTypes[typ]
 }
 
-// shellOption is the exec line's b: the shell after "--", sh (the default, in nearly every image)
-// or bash (not in every image).
-func (k kubectlCmd) shellOption() (option, bool) {
+// shellAction is the exec line's b, a key in its menu rather than under "-" (exec has no other
+// options): it switches the shell after "--" between sh (the default, in nearly every image) and
+// bash (not in every image), labelled with the one it switches to.
+func (k kubectlCmd) shellAction() (action, bool) {
 	if k.end >= len(k.words) || k.end+2 != len(k.words) {
-		return option{}, false // no "-- CMD", or a command with arguments
+		return action{}, false // no "-- CMD", or a command with arguments
 	}
 	cur := bare(k.words[k.end+1])
 	if cur != "sh" && cur != "bash" {
-		return option{}, false
+		return action{}, false
 	}
-	return option{"b", "bash", cur == "bash", func() []string {
-		next := map[string]string{"sh": "bash", "bash": "sh"}[cur]
+	next := map[string]string{"sh": "bash", "bash": "sh"}[cur]
+	return action{"b", next, func() []string {
 		return k.splice(k.end+1, len(k.words), []string{next})
 	}}, true
 }

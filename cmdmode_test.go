@@ -178,7 +178,7 @@ func TestExecShell(t *testing.T) {
 		{"kubectl exec -it p", ""},
 	}
 	for _, c := range cases {
-		out, ok := run("b", true, strings.Fields(c.in))
+		out, ok := run("b", false, strings.Fields(c.in))
 		check(t, "b", c.in, c.want, out, ok)
 	}
 	for in, want := range map[string]string{
