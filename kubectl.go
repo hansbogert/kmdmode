@@ -323,9 +323,9 @@ func kubectlMode(cmd []string) (mode, bool) {
 	if k.sub != "" {
 		m.verbAt = k.subIdx
 	}
-	if pod, ok := k.namedPod(); ok {
+	if target, ok := k.execTarget(); ok {
 		m.actions = append(m.actions, action{"x", "exec", func() []string {
-			return k.without("--output").rebuild("exec", "-it", pod, "--", "sh")
+			return k.without("--output").rebuild("exec", "-it", target, "--", "sh")
 		}})
 	}
 	if k.sub == "exec" {
@@ -414,6 +414,41 @@ func (k kubectlCmd) clusterFlags() []string {
 	return flags
 }
 
+// execTarget returns what x execs into: the one pod the line names, or the one workload it names
+// as TYPE/NAME, where kubectl execs into the first of its pods.
+func (k kubectlCmd) execTarget() (string, bool) {
+	if pod, ok := k.namedPod(); ok {
+		return pod, true
+	}
+	var pos []string
+	switch k.sub {
+	case "get", "describe", "delete":
+		if !namesResources(k) {
+			return "", false
+		}
+		pos = k.pos
+	case "logs":
+		args, ok := logsResource(k)
+		if !ok || k.has("--selector") {
+			return "", false
+		}
+		pos = args
+	case "rollout", "scale":
+		refs, ok := k.workloads()
+		if !ok {
+			return "", false
+		}
+		pos = refs
+	default:
+		return "", false
+	}
+	refs, ok := workloadRefs(pos, anyWorkload)
+	if !ok || len(refs) != 1 {
+		return "", false
+	}
+	return refs[0], true
+}
+
 // namedPod returns the pod a line names, if it names exactly one (get, describe or delete of a
 // pod, or its logs line).
 func (k kubectlCmd) namedPod() (string, bool) {
@@ -469,6 +504,9 @@ func (k kubectlCmd) parent() func() []string {
 			args = []string{"pods"}
 		} else {
 			args = []string{"pod", k.pos[0]}
+			if strings.Contains(k.pos[0], "/") { // exec deploy/d: up to that workload
+				args = k.pos[:1]
+			}
 		}
 	default:
 		return nil

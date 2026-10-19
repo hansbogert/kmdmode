@@ -47,6 +47,8 @@ check 'kubectl get -n ns pods p' x 'kubectl exec -n ns -it p -- sh' 'cmdmode [ku
 check 'kubectl get -f /us' $'\t' 'kubectl get -f /usr/' 'cmdmode [kubectl get]'  # Tab completes, still in cmdmode
 check 'kubectl get -n ns pods p' 'x' 'kubectl exec -n ns -it p -- sh' 'cmdmode [kubectl exec]  [b] bash'
 check 'kubectl get -n ns pods p' 'xb' 'kubectl exec -n ns -it p -- bash' 'cmdmode [kubectl exec]  [b] sh'
+check 'kubectl get -n ns deploy web' x 'kubectl exec -n ns -it deploy/web -- sh' 'cmdmode [kubectl exec]  [b] bash'
+check 'kubectl get -n ns deploy web' $'x\e' 'kubectl get -n ns deploy/web'  # up from exec to the deployment
 check 'kgp pod1' l 'kubectl logs pod1'
 check 'kubectl get pods p' $'\e'x 'kubectl get pods px'
 check 'kubectl get pods p' 'l-ft' 'kubectl logs p -f --timestamps' '[f] -f*'

@@ -99,7 +99,14 @@ func TestApply(t *testing.T) {
 		{"x", "kubectl logs --context c -n ns p -f", "kubectl --context c exec -n ns -it p -- sh"},
 		{"x", "kubectl describe pod/p", "kubectl exec -it p -- sh"},
 		{"x", "kubectl get pods", ""},
-		{"x", "kubectl get deploy d", ""},
+		// a workload: kubectl execs into the first of its pods; one workload only.
+		{"x", "kubectl get -n ns deploy d -o wide", "kubectl exec -n ns -it deploy/d -- sh"},
+		{"x", "kubectl describe sts/db --context c", "kubectl --context c exec -it sts/db -- sh"},
+		{"x", "kubectl logs -n ns deploy/d -f", "kubectl exec -n ns -it deploy/d -- sh"},
+		{"x", "kubectl rollout restart -n ns deploy/d", "kubectl exec -n ns -it deploy/d -- sh"},
+		{"x", "kubectl get deploy a b", ""},
+		{"x", "kubectl get deploy", ""},
+		{"x", "kubectl get svc s", ""},
 		{"X", "kubectl get pods p", ""},
 		// overview: the type's full list across namespaces, wide, in kview, from any kubectl line.
 		{"o", "kubectl logs -n ns -f p --tail 5", "kview kubectl get pods -A -o wide"},
@@ -183,6 +190,7 @@ func TestExecShell(t *testing.T) {
 	}
 	for in, want := range map[string]string{
 		"kubectl exec --context c -n ns -it p -- sh": "kubectl --context c get -n ns pod p",
+		"kubectl exec -n ns -it deploy/web -- sh":    "kubectl get -n ns deploy/web",
 		// naming no pod: up to the pods list where it looks
 		"kubectl exec --context c -n tools -h":                   "kubectl --context c get -n tools pods",
 		"kubectl exec --context c -n tools -it -l app=web": "kubectl --context c get -n tools pods",

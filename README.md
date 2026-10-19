@@ -41,7 +41,9 @@ current one is listed first (one Enter keeps it, now explicit on the line); Esc 
 with the line untouched. Lines cmdmode hands back carry the context along, so this asks once per
 flow. `CMDMODE_CONTEXT_FIRST=0` turns it off.
 
-**x** (exec) on a line naming one pod gives `kubectl exec -it -n NS POD -- sh`, staying in cmdmode
+**x** (exec) on a line naming one pod gives `kubectl exec -it -n NS POD -- sh`, and on one naming a
+workload (deployment, statefulset, daemonset, replicaset) `... -it deploy/NAME -- sh`, where kubectl
+picks the first of its pods, staying in cmdmode
 on the exec line: **b** there (shown as `[b] bash` or `[b] sh`) switches the shell to bash and back (sh is the default; nearly
 every image has it, many lack bash), Enter runs it, and Esc goes up to the pod's get.
 
