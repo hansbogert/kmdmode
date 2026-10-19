@@ -128,8 +128,8 @@ specific resources** (`pods p`, `deploy/d`), never for a bare type, `-l`, `-A`, 
 where it would delete everything that matches; from `logs`, only for a plain pod name, since
 `logs deploy/d` reads one pod and deleting the deployment is a bigger step. d only rewrites the line, and
 Enter on a delete line asks first: it runs only on a capital **Y**; any other key, lowercase `y`
-included, cancels and stays in cmdmode. l is offered for exactly one pod, or
-pods picked by `-l`.
+included, cancels and stays in cmdmode. l is offered for exactly one pod, pods picked by `-l`,
+or one workload (`kubectl logs deploy/NAME`, one of its pods).
 
 **o overview** is in every kubectl mode: a k9s-style live list of the line's resource type across
 all namespaces, `kview kubectl get <type> -A -o wide`. The type is the one `get`/`describe`/

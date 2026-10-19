@@ -21,7 +21,11 @@ func TestApply(t *testing.T) {
 		{"l", "kubectl get pods", ""},
 		{"l", "kubectl get pods -A -l app=api", ""},
 		{"l", "kubectl get pods a b", ""},
-		{"l", "kubectl get deploy d", ""},
+		{"l", "kubectl get svc s", ""},
+		// one workload: kubectl logs one of its pods.
+		{"l", "kubectl get -n ns deploy d -o wide", "kubectl logs -n ns deploy/d"},
+		{"l", "kubectl describe sts/db --context c", "kubectl --context c logs sts/db"},
+		{"l", "kubectl get deploy a b", ""},
 		{"l", "ls -l", ""},
 		{"i", "kubectl get deploy d -n ns -o yaml", "kubectl describe -n ns deploy d"},
 		{"i", "kubectl get pods -A -l app=api", "kubectl describe -A -l app=api pods"},

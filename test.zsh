@@ -40,8 +40,9 @@ check() {  # check LINE KEYS WANT [TEXT the hint (or a message) must show]
 
 check 'kubectl get pods -n ns pod1 ' l 'kubectl logs -n ns pod1 ' 'cmdmode [kubectl logs]  [g] get'
 check "kubectl get pod 'my pod' -o wide" l "kubectl logs 'my pod'"
-check 'kubectl get deploy d -n ns' i 'kubectl describe -n ns deploy d' 'cmdmode [kubectl get]  [i] describe'
-check 'kubectl get deploy d' l 'kubectl get deploy d' "no 'l' here"
+check 'kubectl get deploy d -n ns' i 'kubectl describe -n ns deploy d' 'cmdmode [kubectl describe]'
+check 'kubectl get svc s' l 'kubectl get svc s' "no 'l' here"
+check 'kubectl get -n ns deploy web' l 'kubectl logs -n ns deploy/web' 'cmdmode [kubectl logs]'
 check 'kubectl get pods p' L 'kubectl get pods p' "no 'L' here"  # keys are case-sensitive
 check 'kubectl get -n ns pods p' x 'kubectl exec -n ns -it p -- sh' 'cmdmode [kubectl exec]'
 check 'kubectl get -f /us' $'\t' 'kubectl get -f /usr/' 'cmdmode [kubectl get]'  # Tab completes, still in cmdmode

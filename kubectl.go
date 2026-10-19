@@ -265,9 +265,15 @@ func kubectlMode(cmd []string) (mode, bool) {
 	m := mode{name: strings.TrimSpace(bare(k.words[0]) + " " + k.sub)}
 	switch k.sub {
 	case "get", "describe", "delete":
-		if logArgs, ok := podLogTarget(k); ok {
+		logArgs, ok := podLogTarget(k)
+		if !ok && namesResources(k) { // one workload: kubectl logs one of its pods
+			if refs, one := workloadRefs(k.pos, anyWorkload); one && len(refs) == 1 {
+				logArgs, ok = refs, true
+			}
+		}
+		if ok {
 			m.actions = append(m.actions, action{"l", "logs", func() []string {
-				return k.rebuild("logs", logArgs...)
+				return k.without("--output").rebuild("logs", logArgs...)
 			}})
 		}
 		for _, v := range resourceVerbs {
