@@ -40,7 +40,8 @@ check() {  # check LINE KEYS WANT [TEXT the hint (or a message) must show]
 
 check 'kubectl get pods -n ns pod1 ' l 'kubectl logs -n ns pod1 ' 'cmdmode [kubectl logs]  [g] get'
 check "kubectl get pod 'my pod' -o wide" l "kubectl logs 'my pod'"
-check 'kubectl get deploy d -n ns' i 'kubectl describe -n ns deploy d' 'cmdmode [kubectl describe]'
+check 'kubectl get deploy d -n ns' d 'kubectl describe -n ns deploy d' 'cmdmode [kubectl describe]'
+check 'kubectl get deploy d -n ns' D 'kubectl delete -n ns deploy d' 'cmdmode [kubectl delete]'
 check 'kubectl get svc s' l 'kubectl get svc s' "no 'l' here"
 check 'kubectl get -n ns deploy web' l 'kubectl logs -n ns deploy/web' 'cmdmode [kubectl logs]'
 check 'kubectl get pods p' L 'kubectl get pods p' "no 'L' here"  # keys are case-sensitive
@@ -67,7 +68,7 @@ check 'kubectl get -n ns pods p -o wide' '-a' 'kubectl get -o wide pods -A'  # -
 check 'kubectl get deploy d -n ns' r 'kubectl rollout restart -n ns deploy/d' 'cmdmode [kubectl rollout]'
 check 'kubectl get deploy d -n ns ' s3 'kubectl scale -n ns deploy/d --replicas=3'  # S leaves cmdmode
 check 'kubectl get deploy d -n ns' $'r\e' 'kubectl get -n ns deploy/d' '[Esc] up'
-check 'kubectl get deploy d -n ns' $'r\ei' 'kubectl describe -n ns deploy/d'
+check 'kubectl get deploy d -n ns' $'r\ed' 'kubectl describe -n ns deploy/d'
 check 'kubectl get deploy d -n ns' $'s\em\e' 'kubectl get -n ns deploy/d'  # up from S, which left cmdmode
 check 'kubectl get pods p' $'l-f\e\e' 'kubectl get pod p'  # up out of options, then up from logs
 check 'kubectl get pods p' $'l-f\e' 'kubectl logs p -f'  # Esc keeps the toggle: up, not undo
@@ -472,7 +473,7 @@ for keys ran in Y 'delete -n ns pods p' y ''; do
   zpty -w -n t "kubectl get -n ns pods p"$'\em'
   drain 4
   local screen= asked= chunk
-  zpty -w -n t $'d\r'
+  zpty -w -n t $'D\r'
   repeat 6 { while zpty -rt t chunk; do asked+=$chunk; done; sleep 0.05 }
   zpty -w -n t $keys
   repeat 10 { while zpty -rt t chunk; do screen+=$chunk; done; sleep 0.05 }

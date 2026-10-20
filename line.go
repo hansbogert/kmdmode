@@ -23,7 +23,7 @@ type mode struct {
 
 // Keys of the actions that change the line's verb (logs, get, describe, delete, exec, rollout
 // restart, scale, rollout status), which the hint shows in cyan like the verb itself.
-var verbKeys = set("l", "g", "i", "d", "x", "r", "s", "t")
+var verbKeys = set("l", "g", "d", "D", "x", "r", "s", "t")
 
 type action struct {
 	key   string
@@ -148,7 +148,7 @@ func modeFor(words []string) (mode, bool) {
 }
 
 // run applies the action (or, with toggle, the option) bound to key, case-sensitively (keys are
-// lowercase; capitals are kept for the few that must not be hit by accident, C and Y), and
+// lowercase; capitals are kept for the few that must not be hit by accident, C, D and Y), and
 // splices the result back into the full line, leaving pipes, other commands and env assignments
 // untouched.
 func run(key string, toggle bool, words []string) ([]string, bool) {

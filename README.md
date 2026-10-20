@@ -21,7 +21,7 @@ A line you **run from cmdmode** (Enter) comes back in cmdmode once it ends, e.g.
 it. On an **empty prompt**, Alt-m brings back the most recent command (of the last 20) that has a
 mode, so after `kubectl logs ...` ends you carry on from it; Esc on it goes back to the empty prompt.
 With no kubectl command in recent history, it starts from the pods overview, as o gives it
-(`kview kubectl get pods -A -o wide`), in cmdmode. Keys are case-sensitive and lowercase, except the two you should not hit by accident: **C** (context) and **Y** (confirming a delete).
+(`kview kubectl get pods -A -o wide`), in cmdmode. Keys are case-sensitive and lowercase, except the ones you should not hit by accident: **C** (context), **D** (delete) and **Y** (confirming a delete).
 
 **`:`** switches the resource type the line lists, keeping where it looks (context, `-n`/`-A`,
 `-o`; names and selectors belong to the old type): `[p] pods  [d] deployments  [s] statefulsets
@@ -30,7 +30,7 @@ the line's cluster serves (`kubectl api-resources`, so built-ins and every CRD t
 registered, qualified like `certificates.cert-manager.io`). On a `kview` line it stays watched.
 
 **Colours.** In cmdmode the line's verb (`get`, `logs`, ...) shows in cyan, and so do the actions
-in the hint that change it (`l` logs, `g` get, `i` describe, `d` delete, `x` exec, `r` restart,
+in the hint that change it (`l` logs, `g` get, `d` describe, `D` delete, `x` exec, `r` restart,
 `s` scale, `t` status). The hint is drawn below the line as part of zle's display
 (`POSTDISPLAY`), not as a `zle -M` message, which can't be coloured; it is cleared when the line is
 run or left, so it doesn't stay in the scrollback.
@@ -100,11 +100,11 @@ The helper rewrites the last simple command that has an action, so env prefixes
 
 | Mode               | Actions                                       | Options (after `-`)                                    |
 |--------------------|-----------------------------------------------|--------------------------------------------------------|
-| `kubectl get`      | l logs, i describe, d delete, r restart, s scale, w watch, o overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels`, s sort by age |
-| `kubectl logs`     | g get, i describe, d delete, r restart, s scale, o overview | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
-| `kubectl describe` | l logs, g get, d delete, r restart, s scale, w watch, o overview | e `--show-events=false`                                |
-| `kubectl delete`   | l logs, g get, i describe, r restart, s scale, o overview |
-| `kubectl rollout ...`, `kubectl scale ...` | g get, i describe, l logs, r restart, s scale, t status (minus its own), o overview | |                                                        |
+| `kubectl get`      | l logs, d describe, D delete, r restart, s scale, w watch, o overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels`, s sort by age |
+| `kubectl logs`     | g get, d describe, D delete, r restart, s scale, o overview | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
+| `kubectl describe` | l logs, g get, D delete, r restart, s scale, w watch, o overview | e `--show-events=false`                                |
+| `kubectl delete`   | l logs, g get, d describe, r restart, s scale, o overview |
+| `kubectl rollout ...`, `kubectl scale ...` | g get, d describe, l logs, r restart, s scale, t status (minus its own), o overview | |                                                        |
 | any other `kubectl ...` | o overview                               |                                                        |
 | `kview kubectl ...` (after w or o) | w unwatch (drops kview)    | those of the kubectl command inside, kview kept        |
 
@@ -123,7 +123,7 @@ short name are written kind.group, which kubectl resolves for any CRD). A Deploy
 its ReplicaSet's name (`<deployment>-<pod-template-hash>`), so a pod takes one call. Something you
 created yourself, like most Certificates, has no owner, and u says so.
 
-i is describe as in "inspect", leaving d for delete. **d is offered only when the line names
+Delete is a capital **D**, like the other keys not to hit by accident (C, Y). **D is offered only when the line names
 specific resources** (`pods p`, `deploy/d`), never for a bare type, `-l`, `-A`, `--all` or `-f`,
 where it would delete everything that matches; from `logs`, only for a plain pod name, since
 `logs deploy/d` reads one pod and deleting the deployment is a bigger step. d only rewrites the line, and

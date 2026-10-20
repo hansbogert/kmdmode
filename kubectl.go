@@ -521,8 +521,8 @@ func (k kubectlCmd) parent() func() []string {
 }
 
 // Subcommands that address resources alike ("TYPE NAME..." or "TYPE/NAME"), so a line converts
-// between them. i is describe as in "inspect", leaving d for delete.
-var resourceVerbs = []struct{ key, sub string }{{"g", "get"}, {"i", "describe"}, {"d", "delete"}}
+// between them. Delete is a capital D, like the other keys not to hit by accident (C, Y).
+var resourceVerbs = []struct{ key, sub string }{{"g", "get"}, {"d", "describe"}, {"D", "delete"}}
 
 // namesResources reports whether the line names specific resources. Delete is offered only then:
 // a selector, -A, a file or a bare type would make it delete everything that matches.
