@@ -405,6 +405,27 @@ else
   print "FAIL :. picker: got ${(q)$(<$out)}"; fail=1
 fi
 
+# Esc in that picker goes back to the main menu, not to the ":" list it was opened from.
+: >| $out; : >| $out.hint
+zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
+zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
+zpty -w t "_dump() { print -rn -- \$POSTDISPLAY >| $out.hint; print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+drain 4
+zpty -w -n t "kubectl get -n ns pods"$'\em'
+drain 4
+zpty -w -n t ':.'
+drain 20
+zpty -w -n t $'\e'
+drain 12
+zpty -w -n t $'\x14'
+for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+zpty -d t
+if [[ $(<$out) == 'kubectl get -n ns pods' && $(<$out.hint) == *'cmdmode [kubectl get]'* ]]; then
+  print "ok   :. picker, Esc: back in the main menu"
+else
+  print "FAIL :. picker, Esc: line ${(q)$(<$out)}, hint ${(q)$(<$out.hint)}"; fail=1
+fi
+
 # C (capital only) picks a kubeconfig context in fzf and sets --context on the line; c does not.
 cat >| $fake/kubectl <<'SH'
 #!/bin/sh

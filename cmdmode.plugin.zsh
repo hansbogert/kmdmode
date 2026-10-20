@@ -203,7 +203,8 @@ _cmdmode_dispatch() {
   if [[ $_cmdmode_sub == resources ]]; then
     typ=$KEYS
     if [[ $KEYS == . ]]; then
-      _cmdmode_pick_resource || { _cmdmode_render; return }
+      # Cancelling the picker goes back to the main menu: the ":" list was only the way into it.
+      _cmdmode_pick_resource || { _cmdmode_sub=; _cmdmode_render; return }
       typ=$REPLY
     fi
     if out=$("$_cmdmode_bin" retype "$typ" -- "${words[@]}"); then
