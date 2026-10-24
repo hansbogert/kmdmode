@@ -1,7 +1,7 @@
-bin/cmdmode: *.go go.mod cmdmode.plugin.zsh kview
+bin/kmdmode: *.go go.mod kmdmode.plugin.zsh kview
 	go build -o $@ .
 
-test: bin/cmdmode bin/fzf
+test: bin/kmdmode bin/fzf
 	go test ./...
 	./test.zsh
 

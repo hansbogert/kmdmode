@@ -13,12 +13,12 @@ plain() { print -r -- "$1" | sed 's/\x1b\[[0-9;]*m//g' }
 check() {  # check LINE KEYS WANT [TEXT the hint (or a message) must show]
   local line=$1 keys=$2 want=$3 shows=$4
   : >| $out; : >| $out.hint
-  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
-  zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; alias kgp='kubectl get pods'"
+  zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
+  zpty -w t "PS1='> '; source $root/kmdmode.plugin.zsh; alias kgp='kubectl get pods'"
   # The hint is POSTDISPLAY, which zle redraws incrementally, so dump it rather than read it off
   # the terminal.
   zpty -w t "_dump() { print -rn -- \$POSTDISPLAY >| $out.hint; [[ -n \$BUFFER ]] && print -rn -- \$BUFFER >| $out }"
-  zpty -w t "zle -N _dump; bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
+  zpty -w t "zle -N _dump; bindkey '^T' _dump; bindkey -M kmdmode '^T' _dump"
   zpty -w t "kubectl() { print -rn -- \"ran: kubectl \$*\" >| $out }"
   zpty -w -n t "$line"$'\ek'"$keys"$'\x14'
   local i tty chunk
@@ -29,7 +29,7 @@ check() {  # check LINE KEYS WANT [TEXT the hint (or a message) must show]
   local name="${(q)line} + ${(q)keys}"
   if [[ $(<$out) != "$want" ]]; then
     print "FAIL $name: got ${(q)$(<$out)}, want ${(q)want}"; fail=1
-  elif [[ $tty == *(bad option|command not found|_cmdmode)* ]]; then
+  elif [[ $tty == *(bad option|command not found|_kmdmode)* ]]; then
     print "FAIL $name: zsh error on the terminal: ${(q)tty}"; fail=1
   elif [[ -n $shows && $tty != *"$shows"* && $(<$out.hint) != *"$shows"* ]]; then
     print "FAIL $name: never showed ${(q)shows}; hint was ${(q)$(<$out.hint)}"; fail=1
@@ -38,41 +38,41 @@ check() {  # check LINE KEYS WANT [TEXT the hint (or a message) must show]
   fi
 }
 
-check 'kubectl get pods -n ns pod1 ' l 'kubectl logs -n ns pod1 ' 'cmdmode [kubectl logs]  [g] get'
+check 'kubectl get pods -n ns pod1 ' l 'kubectl logs -n ns pod1 ' 'kmdmode [kubectl logs]  [g] get'
 check "kubectl get pod 'my pod' -o wide" l "kubectl logs 'my pod'"
-check 'kubectl get deploy d -n ns' d 'kubectl describe -n ns deploy d' 'cmdmode [kubectl describe]'
-check 'kubectl get deploy d -n ns' D 'kubectl delete -n ns deploy d' 'cmdmode [kubectl delete]'
+check 'kubectl get deploy d -n ns' d 'kubectl describe -n ns deploy d' 'kmdmode [kubectl describe]'
+check 'kubectl get deploy d -n ns' D 'kubectl delete -n ns deploy d' 'kmdmode [kubectl delete]'
 check 'kubectl get svc s' l 'kubectl get svc s' "no 'l' here"
-check 'kubectl get -n ns deploy web' l 'kubectl logs -n ns deploy/web' 'cmdmode [kubectl logs]'
+check 'kubectl get -n ns deploy web' l 'kubectl logs -n ns deploy/web' 'kmdmode [kubectl logs]'
 check 'kubectl get pods p' L 'kubectl get pods p' "no 'L' here"  # keys are case-sensitive
-check 'kubectl get -n ns pods p' x 'kubectl exec -n ns -it p -- sh' 'cmdmode [kubectl exec]'
-check 'kubectl get -f /us' $'\t' 'kubectl get -f /usr/' 'cmdmode [kubectl get]'  # Tab completes, still in cmdmode
-check 'kubectl get -n ns pods p' 'x' 'kubectl exec -n ns -it p -- sh' 'cmdmode [kubectl exec]  [b] bash'
-check 'kubectl get -n ns pods p' 'xb' 'kubectl exec -n ns -it p -- bash' 'cmdmode [kubectl exec]  [b] sh'
-check 'kubectl get -n ns deploy web' x 'kubectl exec -n ns -it deploy/web -- sh' 'cmdmode [kubectl exec]  [b] bash'
+check 'kubectl get -n ns pods p' x 'kubectl exec -n ns -it p -- sh' 'kmdmode [kubectl exec]'
+check 'kubectl get -f /us' $'\t' 'kubectl get -f /usr/' 'kmdmode [kubectl get]'  # Tab completes, still in kmdmode
+check 'kubectl get -n ns pods p' 'x' 'kubectl exec -n ns -it p -- sh' 'kmdmode [kubectl exec]  [b] bash'
+check 'kubectl get -n ns pods p' 'xb' 'kubectl exec -n ns -it p -- bash' 'kmdmode [kubectl exec]  [b] sh'
+check 'kubectl get -n ns deploy web' x 'kubectl exec -n ns -it deploy/web -- sh' 'kmdmode [kubectl exec]  [b] bash'
 check 'kubectl get -n ns deploy web' $'x\e' 'kubectl get -n ns deploy/web'  # up from exec to the deployment
 check 'kgp pod1' l 'kubectl logs pod1'
 check 'kubectl get pods p' $'\e'x 'kubectl get pods px'
 check 'kubectl get pods p' 'l-ft' 'kubectl logs p -f --timestamps' '[f] -f*'
 check "kubectl get pods p" "l-f" "kubectl logs p -f" "[f] -f*  [p]"
-check 'kubectl logs -f p' '-' 'kubectl logs -f p' 'cmdmode [kubectl logs -]'
+check 'kubectl logs -f p' '-' 'kubectl logs -f p' 'kmdmode [kubectl logs -]'
 check 'kubectl logs -f p' '-f'$'\e''g' 'kubectl get pod p'
-check 'kubectl -n ns ' o 'kview kubectl get pods -A -o wide ' 'cmdmode [kubectl]  [o] overview'
-check 'kubectl -n ns ' o 'kview kubectl get pods -A -o wide ' 'cmdmode [kview kubectl get]  [w] unwatch'
+check 'kubectl -n ns ' o 'kview kubectl get pods -A -o wide ' 'kmdmode [kubectl]  [o] overview'
+check 'kubectl -n ns ' o 'kview kubectl get pods -A -o wide ' 'kmdmode [kview kubectl get]  [w] unwatch'
 check 'kubectl -n ns ' ow 'kubectl get pods -A -o wide '
 check 'kubectl -n ns ' $'o\e' 'kubectl get pods -A -o wide' '[Esc] up'  # watching is a menu below
-check 'kubectl get -n ns pods p -o wide' ':' 'kubectl get -n ns pods p -o wide' 'cmdmode [kubectl get :]  [p] pods'
+check 'kubectl get -n ns pods p -o wide' ':' 'kubectl get -n ns pods p -o wide' 'kmdmode [kubectl get :]  [p] pods'
 check 'kubectl get -n ns pods p -o wide' ':c' 'kubectl get -n ns -o wide configmaps'
 check 'kubectl get -n ns pods p' $':\e' 'kubectl get -n ns pods p'  # Esc leaves the resource list
 check 'kubectl get -n ns pods p -o wide' '-a' 'kubectl get -o wide pods -A'  # -A drops names and -n
-check 'kubectl get deploy d -n ns' r 'kubectl rollout restart -n ns deploy/d' 'cmdmode [kubectl rollout]'
-check 'kubectl get deploy d -n ns ' s3 'kubectl scale -n ns deploy/d --replicas=3'  # S leaves cmdmode
+check 'kubectl get deploy d -n ns' r 'kubectl rollout restart -n ns deploy/d' 'kmdmode [kubectl rollout]'
+check 'kubectl get deploy d -n ns ' s3 'kubectl scale -n ns deploy/d --replicas=3'  # S leaves kmdmode
 check 'kubectl get deploy d -n ns' $'r\e' 'kubectl get -n ns deploy/d' '[Esc] up'
 check 'kubectl get deploy d -n ns' $'r\ed' 'kubectl describe -n ns deploy/d'
-check 'kubectl get deploy d -n ns' $'s\ek\e' 'kubectl get -n ns deploy/d'  # up from S, which left cmdmode
+check 'kubectl get deploy d -n ns' $'s\ek\e' 'kubectl get -n ns deploy/d'  # up from S, which left kmdmode
 check 'kubectl get pods p' $'l-f\e\e' 'kubectl get pod p'  # up out of options, then up from logs
 check 'kubectl get pods p' $'l-f\e' 'kubectl logs p -f'  # Esc keeps the toggle: up, not undo
-check 'kubectl get pods p' $'l-f\r' 'kubectl logs p -f'  # ran, and came back in cmdmode
+check 'kubectl get pods p' $'l-f\r' 'kubectl logs p -f'  # ran, and came back in kmdmode
 # kview: under a real tty, the header stays pinned and the rows refresh.
 kv=$(mktemp)
 print -r -- "stty rows 20 cols 100
@@ -107,9 +107,9 @@ drain() {
 
 check_pick() {  # check_pick KEYS WANT [KEY pressed on the returned prompt]
   : >| $out
-  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
-  zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
-  zpty -w t "_dump() { [[ -n \$BUFFER ]] && print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
+  zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
+  zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/kmdmode.plugin.zsh"
+  zpty -w t "_dump() { [[ -n \$BUFFER ]] && print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey '^T' _dump; bindkey -M kmdmode '^T' _dump"
   zpty -w t "KVIEW_INTERVAL=0.3 kview kubectl get pods -A -o wide"
   drain 30
   [[ -n $1 ]] && { zpty -w -n t $1; drain 20 }
@@ -129,9 +129,9 @@ check_pick() {  # check_pick KEYS WANT [KEY pressed on the returned prompt]
 print -r -- $'#!/bin/sh\ncase "$*" in *go-template*) printf "k8s-app=kube-dns\\ntier=node\\nzone=a\\n"; exit;; esac' >| $fake/labels
 sed -i '1r '$fake/labels $fake/kubectl
 : >| $out
-zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
-zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
-zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
+zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/kmdmode.plugin.zsh"
+zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M kmdmode '^T' _dump"
 zpty -w t "KVIEW_INTERVAL=0.3 kview kubectl get pods -A -o wide"
 drain 30
 zpty -w -n t $'\e\r'
@@ -162,7 +162,7 @@ echo "NAME READY STATUS"; i=1; while [ $i -le 40 ]; do echo "row-$i $r/1 Running
 SH
 rm -f $fake/kubecolor
 for c want in 'get pods' 'kubectl get pods row-6' 'describe pod p' 'kubectl describe pod p'; do
-  print -r -- "stty rows 12 cols 80; export PATH=$fake:\$PATH; unset CMDMODE_PICK_FILE
+  print -r -- "stty rows 12 cols 80; export PATH=$fake:\$PATH; unset KMDMODE_PICK_FILE
 KVIEW_INTERVAL=0.3 $root/kview kubectl $c; print exit=\$?" >| $kv
   screen=$( (sleep 1; printf '\016\016\016\016\016'; sleep 2.5; printf '\r'; sleep 1.5) |
     timeout 12 script -qfc "zsh -f $kv" /dev/null)
@@ -187,9 +187,9 @@ else
 fi
 # Alt-m on an empty prompt recalls the last command with a mode, skipping ones without.
 : >| $out
-zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
-zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { :; }"
-zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
+zpty -w t "PS1='> '; source $root/kmdmode.plugin.zsh; kubectl() { :; }"
+zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M kmdmode '^T' _dump"
 zpty -w t "kubectl logs -n ns p --tail 5"
 zpty -w t "true"
 drain 10
@@ -205,9 +205,9 @@ fi
 # With no kubectl command in history, Alt-m on an empty prompt starts from the pods overview.
 : >| $out
 TTY=
-zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
-zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh"
-zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
+zpty -w t "PS1='> '; source $root/kmdmode.plugin.zsh"
+zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M kmdmode '^T' _dump"
 drain 6
 zpty -w -n t $'\ek'
 local screen chunk
@@ -216,17 +216,17 @@ screen=$(plain $screen)
 zpty -w -n t $'\x14'
 for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
 zpty -d t
-if [[ $(<$out) == 'kview kubectl get pods -A -o wide' && $screen == *'cmdmode [kview kubectl get]'* ]]; then
-  print "ok   empty prompt, no kubectl history, Alt-m: ${(q)$(<$out)} in cmdmode"
+if [[ $(<$out) == 'kview kubectl get pods -A -o wide' && $screen == *'kmdmode [kview kubectl get]'* ]]; then
+  print "ok   empty prompt, no kubectl history, Alt-m: ${(q)$(<$out)} in kmdmode"
 else
   print "FAIL empty prompt, no kubectl history: got ${(q)$(<$out)}"; fail=1
 fi
 
 # The same recall after a rollout restart: its line has a real menu, so T follows the rollout.
 : >| $out
-zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
-zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { :; }"
-zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
+zpty -w t "PS1='> '; source $root/kmdmode.plugin.zsh; kubectl() { :; }"
+zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M kmdmode '^T' _dump"
 zpty -w t "kubectl rollout restart -n ns deploy/d"
 drain 10
 zpty -w -n t $'\ek't$'\x14'
@@ -241,9 +241,9 @@ fi
 # Esc on a recalled rollout line goes up to its workload's get menu; there, at the top, Esc exits.
 for keys want in $'\e' '[kubectl get -n ns deploy/d]' $'\e\e' '[kubectl get -n ns deploy/d]'; do
   : >| $out
-  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
-  zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { :; }"
-  zpty -w t "_dump() { print -rn -- \"[\$BUFFER]\" >| $out }; zle -N _dump; bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
+  zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
+  zpty -w t "PS1='> '; source $root/kmdmode.plugin.zsh; kubectl() { :; }"
+  zpty -w t "_dump() { print -rn -- \"[\$BUFFER]\" >| $out }; zle -N _dump; bindkey '^T' _dump; bindkey -M kmdmode '^T' _dump"
   zpty -w t "kubectl rollout restart -n ns deploy/d"
   drain 10
   zpty -w -n t $'\ek'$keys
@@ -258,15 +258,15 @@ for keys want in $'\e' '[kubectl get -n ns deploy/d]' $'\e\e' '[kubectl get -n n
   fi
 done
 
-# A line run from cmdmode comes back in cmdmode: G then acts on it, and Esc goes up from the
+# A line run from kmdmode comes back in kmdmode: G then acts on it, and Esc goes up from the
 # logs menu to the pod's get menu.
 for keys want in g 'kubectl get -n ns pod p' $'\e' 'kubectl get -n ns pod p'; do
   : >| $out
-  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
+  zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
   rm -f $out.ran
-  zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { print -rn -- \"\$*\" >| $out.ran }"
+  zpty -w t "PS1='> '; source $root/kmdmode.plugin.zsh; kubectl() { print -rn -- \"\$*\" >| $out.ran }"
   zpty -w t "_dump() { print -rn -- \"[\$BUFFER]\" >| $out }; zle -N _dump"
-  zpty -w t "bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
+  zpty -w t "bindkey '^T' _dump; bindkey -M kmdmode '^T' _dump"
   drain 10
   zpty -w -n t "kubectl logs -n ns p"$'\ek\r'
   drain 10
@@ -274,13 +274,13 @@ for keys want in g 'kubectl get -n ns pod p' $'\e' 'kubectl get -n ns pod p'; do
   for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
   zpty -d t
   if [[ $(<$out) == "[$want]" && $(<$out.ran) == 'logs -n ns p' ]]; then
-    print "ok   run from cmdmode, back in cmdmode, ${(q)keys}: ${(q)$(<$out)}"
+    print "ok   run from kmdmode, back in kmdmode, ${(q)keys}: ${(q)$(<$out)}"
   else
-    print "FAIL run from cmdmode, back in cmdmode, ${(q)keys}: got ${(q)$(<$out)}, want [$want]; ran ${(q)$(<$out.ran)}"; fail=1
+    print "FAIL run from kmdmode, back in kmdmode, ${(q)keys}: got ${(q)$(<$out)}, want [$want]; ran ${(q)$(<$out.ran)}"; fail=1
   fi
 done
 
-# Alt-L: untick READY in the column picker, the table drops it, and Esc returns in cmdmode on
+# Alt-L: untick READY in the column picker, the table drops it, and Esc returns in kmdmode on
 # the view's command updated to the chosen columns. A view started with -c shows only those.
 cat >| $fake/kubectl <<'SH'
 #!/bin/sh
@@ -288,9 +288,9 @@ echo "NAMESPACE     NAME        READY   STATUS             RESTARTS   AGE   IP  
 echo "kube-system   coredns-x   1/1     Running            0          2d    10.0.0.1   node-a   <none>           <none>"
 SH
 : >| $out
-zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
-zpty -w t "stty rows 20 cols 140; PS1='> '; source $root/cmdmode.plugin.zsh"
-zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
+zpty -w t "stty rows 20 cols 140; PS1='> '; source $root/kmdmode.plugin.zsh"
+zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M kmdmode '^T' _dump"
 zpty -w t "KVIEW_INTERVAL=0.5 kview kubectl get pods -A -o wide"
 drain 30
 zpty -w -n t $'\el'
@@ -329,9 +329,9 @@ esac
 SH
 for keys want in $'\es\r' 'kubectl get -n ns pods new-c ' $'\es\e' 'kview kubectl get pods -A --sort-by=.metadata.creationTimestamp '; do
   : >| $out
-  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
-  zpty -w t "stty rows 20 cols 140; PS1='> '; source $root/cmdmode.plugin.zsh"
-  zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+  zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
+  zpty -w t "stty rows 20 cols 140; PS1='> '; source $root/kmdmode.plugin.zsh"
+  zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M kmdmode '^T' _dump"
   zpty -w t "KVIEW_INTERVAL=0.5 kview kubectl get pods -A"
   drain 30
   zpty -w -n t ${keys[1,2]}
@@ -357,9 +357,9 @@ case "$*" in
 esac
 SH
 : >| $out
-zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
-zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh"
-zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
+zpty -w t "PS1='> '; source $root/kmdmode.plugin.zsh"
+zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M kmdmode '^T' _dump"
 drain 4
 zpty -w -n t "kubectl get -n ns pods web-7d9f8-x2k"$'\ek'
 drain 4
@@ -384,9 +384,9 @@ case "$*" in
 esac
 SH
 : >| $out
-zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
-zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
-zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
+zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/kmdmode.plugin.zsh"
+zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M kmdmode '^T' _dump"
 drain 4
 zpty -w -n t "kubectl get -n ns pods"$'\ek'
 drain 4
@@ -407,9 +407,9 @@ fi
 
 # Esc in that picker goes back to the main menu, not to the ":" list it was opened from.
 : >| $out; : >| $out.hint
-zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
-zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
-zpty -w t "_dump() { print -rn -- \$POSTDISPLAY >| $out.hint; print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
+zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/kmdmode.plugin.zsh"
+zpty -w t "_dump() { print -rn -- \$POSTDISPLAY >| $out.hint; print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M kmdmode '^T' _dump"
 drain 4
 zpty -w -n t "kubectl get -n ns pods"$'\ek'
 drain 4
@@ -420,7 +420,7 @@ drain 12
 zpty -w -n t $'\x14'
 for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
 zpty -d t
-if [[ $(<$out) == 'kubectl get -n ns pods' && $(<$out.hint) == *'cmdmode [kubectl get]'* ]]; then
+if [[ $(<$out) == 'kubectl get -n ns pods' && $(<$out.hint) == *'kmdmode [kubectl get]'* ]]; then
   print "ok   :. picker, Esc: back in the main menu"
 else
   print "FAIL :. picker, Esc: line ${(q)$(<$out)}, hint ${(q)$(<$out.hint)}"; fail=1
@@ -437,9 +437,9 @@ esac
 SH
 for keys want in C 'kubectl --context prod get -n ns pods' c 'kubectl get -n ns pods'; do
   : >| $out
-  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
-  zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
-  zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
+  zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
+  zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/kmdmode.plugin.zsh"
+  zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M kmdmode '^T' _dump"
   drain 4
   zpty -w -n t "kubectl get -n ns pods"$'\ek'
   drain 4
@@ -462,14 +462,14 @@ for keys want in C 'kubectl --context prod get -n ns pods' c 'kubectl get -n ns 
 done
 
 # Context first: a line naming no context opens the picker on entry, the current one listed
-# first (Enter keeps it); Esc there leaves cmdmode with the line untouched. The fake kubeconfig's
+# first (Enter keeps it); Esc there leaves kmdmode with the line untouched. The fake kubeconfig's
 # current context, mgmt, comes last from get-contexts.
 for keys want in $'\r' 'kubectl --context mgmt get -n ns pods' $'\e' 'kubectl get -n ns pods'; do
   : >| $out
   zpty -b t "env -i HOME=$HOME TERM=xterm PATH=$fake:$PATH zsh -f -i"
-  zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
+  zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/kmdmode.plugin.zsh"
   zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump"
-  zpty -w t "bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
+  zpty -w t "bindkey '^T' _dump; bindkey -M kmdmode '^T' _dump"
   drain 4
   zpty -w -n t "kubectl get -n ns pods"$'\ek'
   drain 20
@@ -488,8 +488,8 @@ done
 # Enter on a delete line asks first: capital Y runs it, y (or anything else) cancels and stays.
 for keys ran in Y 'delete -n ns pods p' y ''; do
   rm -f $out.ran
-  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
-  zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { print -rn -- \"\$*\" >| $out.ran }"
+  zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
+  zpty -w t "PS1='> '; source $root/kmdmode.plugin.zsh; kubectl() { print -rn -- \"\$*\" >| $out.ran }"
   drain 4
   zpty -w -n t "kubectl get -n ns pods p"$'\ek'
   drain 4
@@ -508,15 +508,15 @@ for keys ran in Y 'delete -n ns pods p' y ''; do
   fi
 done
 
-# The release path: `source <(cmdmode init zsh)` gives a working cmdmode and a kview function, and a
+# The release path: `source <(kmdmode init zsh)` gives a working kmdmode and a kview function, and a
 # shell holding an older glue version re-reads the plugin from the binary on Alt-k.
 for case in fresh stale; do
   : >| $out
-  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
-  zpty -w t "PS1='> '; source <($root/bin/cmdmode init zsh)"
-  [[ $case == stale ]] && zpty -w t "_cmdmode_glue=0ld"
-  # Dump from the normal keymap: the reload re-creates the cmdmode one, dropping a test binding.
-  zpty -w t "_dump() { print -rn -- \"\$BUFFER|\$_cmdmode_glue|\$(whence -w kview)\" >| $out }; zle -N _dump; bindkey '^T' _dump"
+  zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
+  zpty -w t "PS1='> '; source <($root/bin/kmdmode init zsh)"
+  [[ $case == stale ]] && zpty -w t "_kmdmode_glue=0ld"
+  # Dump from the normal keymap: the reload re-creates the kmdmode one, dropping a test binding.
+  zpty -w t "_dump() { print -rn -- \"\$BUFFER|\$_kmdmode_glue|\$(whence -w kview)\" >| $out }; zle -N _dump; bindkey '^T' _dump"
   drain 4
   zpty -w -n t "kubectl get -n ns pods p"$'\ekl'
   drain 6
@@ -527,7 +527,7 @@ for case in fresh stale; do
   zpty -w -n t $'\x14'
   for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
   zpty -d t
-  want="kubectl get -n ns pod p|$($root/bin/cmdmode glue)|kview: function"
+  want="kubectl get -n ns pod p|$($root/bin/kmdmode glue)|kview: function"
   if [[ $(<$out) == "$want" ]]; then
     print "ok   init zsh, $case shell: ${(q)$(<$out)}"
   else

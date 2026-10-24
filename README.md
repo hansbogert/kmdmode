@@ -1,4 +1,4 @@
-# cmdmode
+# kmdmode
 
 A modal keymap for zsh that turns the `kubectl` command you are typing into the next one you need,
 a key at a time: from a pod's `get` to its `logs`, `describe`, `exec` or owner, from a deployment
@@ -6,8 +6,8 @@ to a `rollout restart` or `scale`, plus a k9s-style live view (`kview`) of any l
 command lines you can read, edit and run, and that land in your shell history.
 
 ```sh
-go install github.com/OWNER/cmdmode@latest
-echo 'source <(cmdmode init zsh)' >> ~/.zshrc
+go install github.com/OWNER/kmdmode@latest
+echo 'source <(kmdmode init zsh)' >> ~/.zshrc
 ```
 
 See [Install](#install) for the requirements.
@@ -16,22 +16,22 @@ Type `kubectl get pods -n ns pod1`, press **Alt-k**, and the message line names 
 keys:
 
 ```
-cmdmode [kubectl get]  [l] logs  [i] describe  [-] options  [:] resource  [Esc] exit
+kmdmode [kubectl get]  [l] logs  [i] describe  [-] options  [:] resource  [Esc] exit
 ```
 
 Press **l** and the line becomes `kubectl logs -n ns pod1`; the mode follows the line, so you are
 now in `[kubectl logs]`. Press **-** for that mode's flags, each a key that toggles it (`*` = on):
 
 ```
-cmdmode [kubectl logs -]  [f] -f*  [p] -p  [t] --timestamps  [c] --all-containers  ...  [Esc] back
+kmdmode [kubectl logs -]  [f] -f*  [p] -p  [t] --timestamps  [c] --all-containers  ...  [Esc] back
 ```
 
-A line you **run from cmdmode** (Enter) comes back in cmdmode once it ends, e.g. after
+A line you **run from kmdmode** (Enter) comes back in kmdmode once it ends, e.g. after
 `kubectl logs -f` on ctrl-c, so the next key carries on from it; Esc on that returned line clears
 it. On an **empty prompt**, Alt-k brings back the most recent command (of the last 20) that has a
 mode, so after `kubectl logs ...` ends you carry on from it; Esc on it goes back to the empty prompt.
 With no kubectl command in recent history, it starts from the pods overview, as o gives it
-(`kview kubectl get pods -A -o wide`), in cmdmode. Keys are case-sensitive and lowercase, except the ones you should not hit by accident: **C** (context), **D** (delete) and **Y** (confirming a delete).
+(`kview kubectl get pods -A -o wide`), in kmdmode. Keys are case-sensitive and lowercase, except the ones you should not hit by accident: **C** (context), **D** (delete) and **Y** (confirming a delete).
 
 **`:`** switches the resource type the line lists, keeping where it looks (context, `-n`/`-A`,
 `-o`; names and selectors belong to the old type): `[p] pods  [d] deployments  [s] statefulsets
@@ -39,21 +39,21 @@ With no kubectl command in recent history, it starts from the pods overview, as 
 the line's cluster serves (`kubectl api-resources`, so built-ins and every CRD the apiextensions API
 registered, qualified like `certificates.cert-manager.io`). On a `kview` line it stays watched.
 
-**Colours.** In cmdmode the line's verb (`get`, `logs`, ...) shows in cyan, and so do the actions
+**Colours.** In kmdmode the line's verb (`get`, `logs`, ...) shows in cyan, and so do the actions
 in the hint that change it (`l` logs, `g` get, `d` describe, `D` delete, `x` exec, `r` restart,
 `s` scale, `t` status). The hint is drawn below the line as part of zle's display
 (`POSTDISPLAY`), not as a `zle -M` message, which can't be coloured; it is cleared when the line is
 run or left, so it doesn't stay in the scrollback.
 
-**Context first.** When the line names no `--context`, entering cmdmode opens the context picker
+**Context first.** When the line names no `--context`, entering kmdmode opens the context picker
 before anything else, so nothing acts on whatever context the kubeconfig happens to point at. The
-current one is listed first (one Enter keeps it, now explicit on the line); Esc there leaves cmdmode
-with the line untouched. Lines cmdmode hands back carry the context along, so this asks once per
-flow. `CMDMODE_CONTEXT_FIRST=0` turns it off.
+current one is listed first (one Enter keeps it, now explicit on the line); Esc there leaves kmdmode
+with the line untouched. Lines kmdmode hands back carry the context along, so this asks once per
+flow. `KMDMODE_CONTEXT_FIRST=0` turns it off.
 
 **x** (exec) on a line naming one pod gives `kubectl exec -it -n NS POD -- sh`, and on one naming a
 workload (deployment, statefulset, daemonset, replicaset) `... -it deploy/NAME -- sh`, where kubectl
-picks the first of its pods, staying in cmdmode
+picks the first of its pods, staying in kmdmode
 on the exec line: **b** there (shown as `[b] bash` or `[b] sh`) switches the shell to bash and back (sh is the default; nearly
 every image has it, many lack bash), Enter runs it, and Esc goes up to the pod's get.
 
@@ -62,14 +62,14 @@ headed by the one the line uses now, and sets `--context NAME` on the line: repl
 added right after `kubectl`. Only the line changes, not the kubeconfig's current context, so other
 terminals are unaffected. On a `kview` line it goes into the watched command.
 
-**Tab** completes as it does outside cmdmode (through whatever your normal keymap binds Tab to,
+**Tab** completes as it does outside kmdmode (through whatever your normal keymap binds Tab to,
 e.g. fzf's or fzf-tab's completion) and then shows the menu for the completed line.
 
 **Esc** goes up one menu: out of the option list (toggles kept), then from an action's menu
 (`logs`, `rollout`, `scale`, `describe`, `delete`) to the get menu of the resource it acts on,
 e.g. `kubectl rollout restart -n ns deploy/d` up to `kubectl get -n ns deploy/d`, and from a
 `kview ...` line (after w or o) to the plain command it watches, then, at a top menu, out of
-cmdmode. The hint says `[Esc] up` or `[Esc] exit`. **Enter** runs the line (in every menu, so the hint leaves it out).
+kmdmode. The hint says `[Esc] up` or `[Esc] exit`. **Enter** runs the line (in every menu, so the hint leaves it out).
 
 ## Install
 
@@ -79,22 +79,22 @@ or Homebrew have a current one). [kubecolor](https://github.com/kubecolor/kubeco
 and colours kview.
 
 ```sh
-go install github.com/OWNER/cmdmode@latest     # or a binary from the releases page
+go install github.com/OWNER/kmdmode@latest     # or a binary from the releases page
 ```
 
 Then in `~/.zshrc`, after your other plugins load:
 
 ```zsh
-source <(cmdmode init zsh)
+source <(kmdmode init zsh)
 ```
 
-and `exec zsh`. `cmdmode init zsh` prints the zsh side from the binary, as `kubectl completion zsh`
+and `exec zsh`. `kmdmode init zsh` prints the zsh side from the binary, as `kubectl completion zsh`
 does, so the two always match. After an upgrade, shells already open re-read it on their next
 Alt-k.
 
-Press **Alt-k** on a `kubectl` line. Set `CMDMODE_KEY` before the `source` line for another key,
-e.g. `CMDMODE_KEY='^[m'` for Alt-m, and `CMDMODE_CONTEXT_FIRST=0` to skip choosing a context first.
-`kview` is available as a shell function, and as `cmdmode kview` everywhere else.
+Press **Alt-k** on a `kubectl` line. Set `KMDMODE_KEY` before the `source` line for another key,
+e.g. `KMDMODE_KEY='^[m'` for Alt-m, and `KMDMODE_CONTEXT_FIRST=0` to skip choosing a context first.
+`kview` is available as a shell function, and as `kmdmode kview` everywhere else.
 
 ## How it works
 
@@ -102,8 +102,8 @@ The widget splits the buffer with `${(z)BUFFER}` (quotes stay inside the words, 
 round-trips), expands a leading alias, and asks the Go helper:
 
 ```sh
-cmdmode menu -- kubectl get pods -n ns pod1       # mode, action, option ... lines
-cmdmode apply l -- kubectl get pods -n ns pod1    # kubectl logs -n ns pod1
+kmdmode menu -- kubectl get pods -n ns pod1       # mode, action, option ... lines
+kmdmode apply l -- kubectl get pods -n ns pod1    # kubectl logs -n ns pod1
 ```
 
 The helper rewrites the last simple command that has an action, so env prefixes
@@ -124,7 +124,7 @@ The helper rewrites the last simple command that has an action, so env prefixes
 **r** (`kubectl rollout restart`), **s** (`kubectl scale ... --replicas=`) and **t** (`kubectl rollout
 status`, which follows a rollout until done) are offered for named workloads of a kind the command
 accepts: restart and status for deployments, statefulsets and daemonsets, scale for deployments,
-statefulsets and replicasets. s leaves cmdmode with the cursor after
+statefulsets and replicasets. s leaves kmdmode with the cursor after
 `--replicas=`, so you type the count and Enter.
 
 **u** (owner) goes from any single named resource to what owns it, e.g. from a pod to what runs
@@ -141,7 +141,7 @@ specific resources** (`pods p`, `deploy/d`), never for a bare type, `-l`, `-A`, 
 where it would delete everything that matches; from `logs`, only for a plain pod name, since
 `logs deploy/d` reads one pod and deleting the deployment is a bigger step. d only rewrites the line, and
 Enter on a delete line asks first: it runs only on a capital **Y**; any other key, lowercase `y`
-included, cancels and stays in cmdmode. l is offered for exactly one pod, pods picked by `-l`,
+included, cancels and stays in kmdmode. l is offered for exactly one pod, pods picked by `-l`,
 or one workload (`kubectl logs deploy/NAME`, one of its pods).
 
 **o overview** is in every kubectl mode: a k9s-style live list of the line's resource type across
@@ -150,7 +150,7 @@ all namespaces, `kview kubectl get <type> -A -o wide`. The type is the one `get`
 any line: only the flags that pick the cluster and identity (`--context`, `--kubeconfig`, `--as`,
 ...) carry over; names, `-n`, `-l` and other selectors, sorting and output flags reset.
 
-`kview CMD...` (`cmdmode kview` under the hood) shows CMD's output in fzf: scroll
+`kview CMD...` (`kmdmode kview` under the hood) shows CMD's output in fzf: scroll
 it, type to filter, the first line stays pinned as the header, and CMD re-runs `$KVIEW_INTERVAL`
 (default 2) seconds after each fetch. ctrl-r refreshes now, Esc leaves. kubectl output is colored
 through [kubecolor](https://github.com/kubecolor/kubecolor) when it is on PATH
@@ -162,7 +162,7 @@ name would block keys after each refresh and lose an Enter now and then), ctrl-z
 faults, and
 Enter picks the row (below). Anything else, like `kubectl describe`, is a **document**: long lines
 wrap, and Enter puts the command itself back on the prompt. Either way the prompt it returns to
-is already in cmdmode, so one key carries on (e.g. l for logs of the picked pod). **w** (watch) in a get or describe mode wraps the line in kview.
+is already in kmdmode, so one key carries on (e.g. l for logs of the picked pod). **w** (watch) in a get or describe mode wraps the line in kview.
 
 kview fetches outside fzf: a background loop runs CMD into a file and then tells fzf, over a
 private socket, to reload from that file. While a reload runs, fzf drops cursor keys and holds
@@ -171,14 +171,14 @@ with an older one kview says so and falls back to `watch`.
 
 **ctrl-z** (as in k9s) toggles to faulty rows only, marked `[faults only]` in the header: a STATUS
 other than Running/Completed/Succeeded, or a READY count short of its total (which also catches
-deployments and statefulsets). The filter is `cmdmode faults`, which kview pipes the command
+deployments and statefulsets). The filter is `kmdmode faults`, which kview pipes the command
 through while the toggle is on.
 
 **Alt-L** picks which of the table's columns to show (Tab toggles, Enter applies at once;
 NAMESPACE and NAME always stay, since picking a row reads them). It starts from what is shown,
 or, the first time, everything but IP, NOMINATED NODE and READINESS GATES. `kview -c COL,...`
 starts with a choice, and leaving with Esc after changing columns returns that command, updated,
-in cmdmode. Columns are cut from kubectl's own table rather than `-o custom-columns`, which can't
+in kmdmode. Columns are cut from kubectl's own table rather than `-o custom-columns`, which can't
 compute READY, a STATUS like CrashLoopBackOff, RESTARTS or AGE.
 
 **Alt-S** sorts by age, newest first, marked `[newest first]` in the header: kubectl's
@@ -188,13 +188,13 @@ leaves the newest at the bottom, just above the prompt. Esc after toggling retur
 with or without the flag.
 
 **Alt-Enter** on a row fetches its labels into a second fzf: tick any (Tab), Enter, and you are
-back in cmdmode on a get of everything of that type in the row's namespace carrying them, e.g.
+back in kmdmode on a get of everything of that type in the row's namespace carrying them, e.g.
 `kubectl get -n cert-manager pods -l app=cert-manager,app.kubernetes.io/component=controller`.
 (Shift-Enter would be nicer, but most terminals, GNOME Terminal included, send it as plain Enter.)
 
 **Enter** on a row puts a command for that resource on your next prompt, e.g. Enter on
 `kube-system coredns-x ...` gives `kubectl get -n kube-system pods coredns-x`, ready for Alt-k.
-kview writes the line to `$CMDMODE_PICK_FILE` and the plugin's precmd hook loads it with
+kview writes the line to `$KMDMODE_PICK_FILE` and the plugin's precmd hook loads it with
 `print -z`; without the plugin, kview prints the line instead.
 
 An option toggles: on removes it, a different value (`-o yaml` when pressing o) is replaced,
@@ -214,12 +214,12 @@ To add a mode, return it from `commandMode` in `line.go`.
 make test       # Go table tests plus a zpty-driven run of the real widget
 ```
 
-`make` builds `bin/cmdmode`, and `make test` also installs fzf v0.74.4 into `bin/` for kview's
+`make` builds `bin/kmdmode`, and `make test` also installs fzf v0.74.4 into `bin/` for kview's
 tests. To try a checkout without installing it, source the plugin from it: it then uses the
 checkout's `bin/`.
 
 ```zsh
-source ~/src/cmdmode/cmdmode.plugin.zsh
+source ~/src/kmdmode/kmdmode.plugin.zsh
 ```
 
 Releases are built by [GoReleaser](https://goreleaser.com) from a `v*` tag

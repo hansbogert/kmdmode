@@ -5,7 +5,7 @@ import (
 	"slices"
 )
 
-// A mode is what cmdmode offers for one recognised command, e.g. "kubectl get": actions rewrite
+// A mode is what kmdmode offers for one recognised command, e.g. "kubectl get": actions rewrite
 // it into another command, options toggle one of its flags. Both return the new command words.
 type mode struct {
 	name    string

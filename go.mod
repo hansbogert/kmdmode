@@ -1,3 +1,3 @@
-module github.com/OWNER/cmdmode
+module github.com/OWNER/kmdmode
 
 go 1.22

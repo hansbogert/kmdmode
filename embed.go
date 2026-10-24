@@ -16,7 +16,7 @@ import (
 // The zsh side ships inside the binary, as `kubectl completion zsh` does, so a `go install` is the
 // whole install and the glue always matches the binary that answers it.
 var (
-	//go:embed cmdmode.plugin.zsh
+	//go:embed kmdmode.plugin.zsh
 	pluginZsh string
 	//go:embed kview
 	kviewZsh string
@@ -37,7 +37,7 @@ func releaseVersion() string {
 }
 
 // glueVersion identifies the embedded zsh code. A shell whose loaded plugin reports another one
-// re-sources `cmdmode init zsh` on its next Alt-m, so an upgrade reaches shells already open.
+// re-sources `kmdmode init zsh` on its next Alt-m, so an upgrade reaches shells already open.
 func glueVersion() string {
 	sum := sha256.Sum256([]byte(pluginZsh + kviewZsh))
 	return hex.EncodeToString(sum[:6])
@@ -46,7 +46,7 @@ func glueVersion() string {
 func executable() string {
 	exe, err := os.Executable()
 	if err != nil {
-		return "cmdmode"
+		return "kmdmode"
 	}
 	if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 		return resolved
@@ -54,10 +54,10 @@ func executable() string {
 	return exe
 }
 
-// initZsh prints the plugin for `source <(cmdmode init zsh)`, preset with this binary's path and
+// initZsh prints the plugin for `source <(kmdmode init zsh)`, preset with this binary's path and
 // the glue version.
 func initZsh() {
-	fmt.Printf("typeset -g _cmdmode_bin=%s _cmdmode_glue=%s\n", shellQuote(executable()), glueVersion())
+	fmt.Printf("typeset -g _kmdmode_bin=%s _kmdmode_glue=%s\n", shellQuote(executable()), glueVersion())
 	fmt.Print(pluginZsh)
 }
 
@@ -74,10 +74,10 @@ func runKview(args []string) error {
 		return fmt.Errorf("kview needs zsh: %w", err)
 	}
 	exe := executable()
-	env := append(os.Environ(), "CMDMODE_BIN="+exe)
-	if fzf := filepath.Join(filepath.Dir(exe), "fzf"); os.Getenv("CMDMODE_FZF") == "" {
+	env := append(os.Environ(), "KMDMODE_BIN="+exe)
+	if fzf := filepath.Join(filepath.Dir(exe), "fzf"); os.Getenv("KMDMODE_FZF") == "" {
 		if st, err := os.Stat(fzf); err == nil && !st.IsDir() {
-			env = append(env, "CMDMODE_FZF="+fzf)
+			env = append(env, "KMDMODE_FZF="+fzf)
 		}
 	}
 	argv := append([]string{"zsh", "-c", kviewZsh, "kview"}, args...)

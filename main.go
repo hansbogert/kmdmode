@@ -1,29 +1,29 @@
-// Command cmdmode rewrites a shell command line into a related command.
+// Command kmdmode rewrites a shell command line into a related command.
 //
 // The zsh widget splits the buffer with ${(z)BUFFER} and passes the words as arguments, so quotes
 // stay literal inside each word and joining with single spaces gives back a valid command line.
 //
-//	cmdmode menu -- WORD...        print the mode and its actions and options, tab-separated:
+//	kmdmode menu -- WORD...        print the mode and its actions and options, tab-separated:
 //	                               "mode NAME", "action KEY LABEL", "option KEY LABEL on|off",
 //	                               "up" when it has a parent menu, "nocontext" when the line
 //	                               names no --context, "verb IDX" for the index of the verb word;
 //	                               actions that change the verb end in a "verb" field
-//	cmdmode apply KEY -- WORD...   print the line after action KEY; exit 1 if it does not apply
-//	cmdmode toggle KEY -- WORD...  print the line after toggling option KEY; exit 1 likewise
-//	cmdmode up -- WORD...          print the line of the parent menu; exit 1 at a top menu
-//	cmdmode retype TYPE|KEY -- WORD...  print the line listing another resource type (":" menu)
-//	cmdmode api-resources -- WORD...    print every listable resource type of the line's cluster
-//	cmdmode contexts -- WORD...    print the context the line uses, then every kubeconfig context
-//	cmdmode context NAME -- WORD...  print the line using context NAME (C)
-//	cmdmode pick -- WORD...        print a command for the row on stdin, picked from WORD's output
-//	cmdmode select -- WORD...      like pick, for stdin's row then label lines: a get by selector
-//	cmdmode faults                 filter the kubectl table on stdin to its unhealthy rows
-//	cmdmode columns COL,...        keep only these columns (and NAMESPACE, NAME) of that table
-//	cmdmode columns --list [COL,...]  print its columns as "NAME on|off" for a picker
-//	cmdmode init zsh               print the zsh plugin, for `source <(cmdmode init zsh)` in .zshrc
-//	cmdmode kview [-c COL,...] CMD...  the live view (the plugin's kview runs this)
-//	cmdmode glue                   print the version of the embedded zsh code
-//	cmdmode version                print the release version
+//	kmdmode apply KEY -- WORD...   print the line after action KEY; exit 1 if it does not apply
+//	kmdmode toggle KEY -- WORD...  print the line after toggling option KEY; exit 1 likewise
+//	kmdmode up -- WORD...          print the line of the parent menu; exit 1 at a top menu
+//	kmdmode retype TYPE|KEY -- WORD...  print the line listing another resource type (":" menu)
+//	kmdmode api-resources -- WORD...    print every listable resource type of the line's cluster
+//	kmdmode contexts -- WORD...    print the context the line uses, then every kubeconfig context
+//	kmdmode context NAME -- WORD...  print the line using context NAME (C)
+//	kmdmode pick -- WORD...        print a command for the row on stdin, picked from WORD's output
+//	kmdmode select -- WORD...      like pick, for stdin's row then label lines: a get by selector
+//	kmdmode faults                 filter the kubectl table on stdin to its unhealthy rows
+//	kmdmode columns COL,...        keep only these columns (and NAMESPACE, NAME) of that table
+//	kmdmode columns --list [COL,...]  print its columns as "NAME on|off" for a picker
+//	kmdmode init zsh               print the zsh plugin, for `source <(kmdmode init zsh)` in .zshrc
+//	kmdmode kview [-c COL,...] CMD...  the live view (the plugin's kview runs this)
+//	kmdmode glue                   print the version of the embedded zsh code
+//	kmdmode version                print the release version
 package main
 
 import (
@@ -72,7 +72,7 @@ func main() {
 		if m.context != nil { // C, case-sensitive: the zsh side runs the picker
 			fmt.Println("action\tC\tcontext")
 			if m.currentContext == "" {
-				fmt.Println("nocontext") // so entering cmdmode asks for one first
+				fmt.Println("nocontext") // so entering kmdmode asks for one first
 			}
 		}
 		if m.retype != nil {
@@ -170,8 +170,8 @@ func main() {
 			os.Exit(1)
 		}
 	default:
-		fmt.Fprintln(os.Stderr, "usage: cmdmode init zsh | cmdmode kview CMD... | cmdmode version")
-		fmt.Fprintln(os.Stderr, "internal, for the zsh plugin: cmdmode menu|up|api-resources|contexts|pick|select -- WORD... | cmdmode retype TYPE|context NAME -- WORD... | cmdmode apply|toggle KEY -- WORD... | cmdmode faults | cmdmode columns [--list] COL,...")
+		fmt.Fprintln(os.Stderr, "usage: kmdmode init zsh | kmdmode kview CMD... | kmdmode version")
+		fmt.Fprintln(os.Stderr, "internal, for the zsh plugin: kmdmode menu|up|api-resources|contexts|pick|select -- WORD... | kmdmode retype TYPE|context NAME -- WORD... | kmdmode apply|toggle KEY -- WORD... | kmdmode faults | kmdmode columns [--list] COL,...")
 		os.Exit(2)
 	}
 }

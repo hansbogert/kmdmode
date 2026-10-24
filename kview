@@ -3,25 +3,25 @@
 # the first line pinned as the header; CMD re-runs $KVIEW_INTERVAL (2) seconds after each refresh,
 # and the cursor keeps its place in the list across refreshes. ctrl-r refreshes now.
 #
-# "kubectl get" output is a table: ctrl-z shows only faulty rows (cmdmode faults), Alt-L picks
+# "kubectl get" output is a table: ctrl-z shows only faulty rows (kmdmode faults), Alt-L picks
 # which columns to show (-c gives them up front), Alt-S sorts by age, newest first (kubectl's
 # --sort-by=.metadata.creationTimestamp, reversed), Enter puts a command for the picked row (e.g.
 # "kubectl get -n NS pods NAME") on the next prompt, and Alt-Enter lets you tick the row's labels
 # for a get by selector instead (shift-enter can't be told apart from Enter in most terminals).
 # Anything else, like "kubectl describe", is a document: long lines wrap, and Enter puts CMD
-# itself on the next prompt. Either prompt opens in cmdmode, so one key carries on. Esc leaves
+# itself on the next prompt. Either prompt opens in kmdmode, so one key carries on. Esc leaves
 # with an empty one, or, when the columns or sort changed, with this view's command updated.
 #
 # kubectl output is colored through kubecolor when it is installed. Needs fzf 0.59+ (--wrap,
-# trigger), else falls back to watch. Runs as `cmdmode kview`, which embeds this script and sets
-# CMDMODE_BIN (and CMDMODE_FZF when an fzf sits next to the binary); run straight from a checkout,
+# trigger), else falls back to watch. Runs as `kmdmode kview`, which embeds this script and sets
+# KMDMODE_BIN (and KMDMODE_FZF when an fzf sits next to the binary); run straight from a checkout,
 # it uses the checkout's bin/.
 emulate -L zsh
 here=${0:A:h}
-bin=${CMDMODE_BIN:-$here/bin/cmdmode}
-fzf=$CMDMODE_FZF
+bin=${KMDMODE_BIN:-$here/bin/kmdmode}
+fzf=$KMDMODE_FZF
 if [[ -z $fzf ]]; then
-  if [[ -z $CMDMODE_BIN && -x $here/bin/fzf ]]; then
+  if [[ -z $KMDMODE_BIN && -x $here/bin/fzf ]]; then
     fzf=$here/bin/fzf  # a checkout's own, from make
   elif (( $+commands[fzf] )); then
     fzf=fzf
@@ -150,10 +150,10 @@ else
     line=$($bin select -- ${(q-)@} <<<"$row"$'\n'"$labels") || exit 1
   fi
 fi
-# The plugin's precmd hook puts what lands in $CMDMODE_PICK_FILE on the next prompt; without the
+# The plugin's precmd hook puts what lands in $KMDMODE_PICK_FILE on the next prompt; without the
 # plugin, print it instead.
-if [[ -n $CMDMODE_PICK_FILE ]]; then
-  print -r -- $line >| $CMDMODE_PICK_FILE
+if [[ -n $KMDMODE_PICK_FILE ]]; then
+  print -r -- $line >| $KMDMODE_PICK_FILE
 else
   print -r -- $line
 fi

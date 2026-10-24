@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-// Owner kinds cmdmode knows by a short name, to that name; any other kind is written as
+// Owner kinds kmdmode knows by a short name, to that name; any other kind is written as
 // kind.group (e.g. certificate.cert-manager.io), which kubectl resolves for any CRD.
 var ownerKinds = map[string]string{
 	"ReplicaSet": "rs", "Deployment": "deploy", "StatefulSet": "sts", "DaemonSet": "ds",
