@@ -224,3 +224,7 @@ source ~/src/kmdmode/kmdmode.plugin.zsh
 
 Releases are built by [GoReleaser](https://goreleaser.com) from a `v*` tag
 (`.github/workflows/release.yml`); CI runs `make test` on every push.
+
+## License
+
+Copyright 2026 Hans van den Bogert. Licensed under the [Apache License, Version 2.0](LICENSE).
