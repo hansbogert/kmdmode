@@ -80,27 +80,32 @@ show="sh $run/filter < $run/raw"
 opts=(--ansi --track --header-lines=1 --layout=reverse --no-sort --info=inline --prompt="$* > ")
 if [[ $1 == kubectl && ${@[(I)get]} -gt 0 ]]; then
   # ctrl-z (as in k9s) shows only faulty rows while $run/faults exists; Alt-L writes the chosen
-  # columns to $run/columns; Alt-S sorts by age while $run/sort exists, newest first: kubectl
-  # sorts oldest first, so the rows of a fetch made sorted ($run/sorted) are reversed.
+  # columns to $run/columns; Alt-S shows the newest first while $run/sort exists. Tables are always
+  # fetched oldest first (--sort-by creationTimestamp), so Alt-S only reverses the rows, and
+  # otherwise they are put back in kubectl's usual namespace/name order: either way at once, from
+  # the last fetch, with no new one.
   [[ -n $cols ]] && print -r -- $cols >| $run/columns
   [[ -n $sorted ]] && touch $run/sort
   cat >| $run/filter <<EOF
 f=cat; [ -e $run/faults ] && f="$bin faults"
-{ if [ -s $run/columns ]; then \$f | $bin columns "\$(cat $run/columns)"; else \$f; fi; } |
-if [ -e $run/sorted ]; then
-  awk 'NR == 1 { print \$0 "  [newest first]"; next } { r[n++] = \$0 } END { while (n) print r[--n] }'
+\$f |
+if [ -e $run/sort ]; then
+  awk 'NR == 1 { print; next } { r[n++] = \$0 } END { while (n) print r[--n] }'
 else
-  cat
-fi
+  $bin order name
+fi |
+{ if [ -s $run/columns ]; then $bin columns "\$(cat $run/columns)"; else cat; fi; } |
+if [ -e $run/sort ]; then awk 'NR == 1 { print \$0 "  [newest first]"; next } 1'; else cat; fi
 EOF
+  fetch=$cmd_age
   opts+=(--expect=alt-enter
     --header="enter: pick  alt-enter: by labels  alt-l: columns  alt-s: by age  ctrl-z: faults  ctrl-r: refresh  esc: quit"
     --bind "ctrl-z:execute-silent([ -e $run/faults ] && rm -f $run/faults || touch $run/faults)+reload($show)"
     --bind "alt-l:execute(${(q)bin} kview --pick-columns $run)+reload($show)"
-    --bind "alt-s:execute-silent([ -e $run/sort ] && rm -f $run/sort || touch $run/sort; touch $run/now)")
+    --bind "alt-s:execute-silent([ -e $run/sort ] && rm -f $run/sort || touch $run/sort)+reload($show)")
 else
   print -r -- cat >| $run/filter
-  document=1
+  fetch=$cmd document=1
   opts+=(--wrap --header="enter: back to the prompt with it  ctrl-r: refresh  esc: quit")
 fi
 # Refresh outside fzf: while a reload is running fzf drops cursor keys and holds Enter, so it
@@ -108,14 +113,10 @@ fi
 # keys for a moment after every reload, so an Enter could be lost; --track alone keeps the
 # cursor's position instead. This ticker runs the command into $run/raw, then presses f12 over
 # fzf's private socket, which reloads from that file in milliseconds. It fetches at once, then
-# $interval seconds after each fetch, or sooner when ctrl-r or Alt-S touch $run/now.
+# $interval seconds after each fetch, or sooner when ctrl-r touches $run/now.
 {
   while :; do
-    if [[ -e $run/sort ]]; then
-      eval $cmd_age >| $run/next && mv $run/next $run/raw && touch $run/sorted
-    else
-      eval $cmd >| $run/next && mv $run/next $run/raw && rm -f $run/sorted
-    fi
+    eval $fetch >| $run/next && mv $run/next $run/raw
     curl -s --unix-socket $run/fzf.sock -d 'trigger(f12)' http://localhost >/dev/null
     for (( t = 0; t < interval * 10; t++ )); do [[ -e $run/now ]] && break; sleep 0.1; done
     rm -f $run/now

@@ -88,7 +88,7 @@ fi
 # kubecolor print a colored table, so this also checks the colors are stripped from the pick;
 # after ctrl-z only the crashing pod is listed, so Enter picks that one.
 fake=$(mktemp -d)
-print -r -- $'#!/bin/sh\nprintf "NAMESPACE NAME READY STATUS\\n\\033[36mkube-system\\033[0m coredns-x 1/1 \\033[32mRunning\\033[0m\\nkube-system bad-y 0/1 CrashLoopBackOff\\n"' >| $fake/kubectl
+print -r -- $'#!/bin/sh\nprintf "NAMESPACE NAME READY STATUS\\n\\033[36mkube-system\\033[0m coredns-x 1/1 \\033[32mRunning\\033[0m\\nkube-system web-y 0/1 CrashLoopBackOff\\n"' >| $fake/kubectl
 cp $fake/kubectl $fake/kubecolor
 chmod +x $fake/kubectl $fake/kubecolor
 
@@ -148,7 +148,7 @@ else
 fi
 
 check_pick '' 'kubectl get -n kube-system pods coredns-x '
-check_pick $'\x1a' 'kubectl get -n kube-system pods bad-y '
+check_pick $'\x1a' 'kubectl get -n kube-system pods web-y '
 check_pick '' 'kubectl logs -n kube-system coredns-x ' l
 # kview keeps the cursor on its row across refreshes, though READY flips each time, and Enter on
 # a describe document gives the describe line back.
@@ -158,10 +158,10 @@ if [ "$1" = describe ]; then
   echo "Name: p"; i=1; while [ $i -le 40 ]; do echo "Field-$i: value"; i=$((i+1)); done; exit
 fi
 r=$(( $(date +%s) % 2 ))
-echo "NAME READY STATUS"; i=1; while [ $i -le 40 ]; do echo "row-$i $r/1 Running"; i=$((i+1)); done
+echo "NAME READY STATUS"; i=1; while [ $i -le 40 ]; do printf 'row-%02d %s/1 Running\n' $i $r; i=$((i+1)); done
 SH
 rm -f $fake/kubecolor
-for c want in 'get pods' 'kubectl get pods row-6' 'describe pod p' 'kubectl describe pod p'; do
+for c want in 'get pods' 'kubectl get pods row-06' 'describe pod p' 'kubectl describe pod p'; do
   print -r -- "stty rows 12 cols 80; export PATH=$fake:\$PATH; unset KMDMODE_PICK_FILE
 KVIEW_INTERVAL=0.3 $root/kview kubectl $c; print exit=\$?" >| $kv
   screen=$( (sleep 1; printf '\016\016\016\016\016'; sleep 2.5; printf '\r'; sleep 1.5) |
@@ -317,8 +317,9 @@ else
   print "FAIL kview -c: ${(q)screen[1,300]}"; fail=1
 fi
 
-# Alt-S sorts by age, newest first: the fake lists oldest first only when given the sort, so the
-# top row after Alt-S is the newest. Esc returns the command with the sort.
+# Alt-S sorts by age, newest first: kview always fetches sorted (the fake lists oldest first only
+# when given the sort) and shows namespace/name order unless Alt-S is on, when the top row is the
+# newest. Esc returns the command with the sort.
 cat >| $fake/kubectl <<'SH'
 #!/bin/sh
 echo "NAMESPACE   NAME    READY   STATUS"
@@ -340,6 +341,7 @@ for keys want in $'\es\r' 'kubectl get -n ns pods new-c ' $'\es\e' 'kview kubect
   drain 20
   zpty -w -n t $'\x14'
   for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+
   zpty -d t
   if [[ $(<$out) == "$want" ]]; then
     print "ok   kview Alt-S then ${(q)keys[3,-1]}: ${(q)$(<$out)}"
@@ -347,6 +349,33 @@ for keys want in $'\es\r' 'kubectl get -n ns pods new-c ' $'\es\e' 'kview kubect
     print "FAIL kview Alt-S then ${(q)keys[3,-1]}: got ${(q)$(<$out)}, want ${(q)want}"; fail=1
   fi
 done
+
+# Alt-S reacts at once, from the last fetch: with every kubectl call taking 3 seconds, Alt-S then
+# Enter a moment later still picks the newest pod.
+cat >| $fake/kubectl <<'SH'
+#!/bin/sh
+sleep 3
+echo "NAMESPACE   NAME    READY   STATUS"
+printf 'ns   old-a   1/1   Running\nns   mid-b   1/1   Running\nns   new-c   1/1   Running\n'
+SH
+: >| $out
+zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$root:$PATH zsh -f -i"
+zpty -w t "stty rows 20 cols 140; PS1='> '; source $root/kmdmode.plugin.zsh"
+zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M kmdmode '^T' _dump"
+zpty -w t "KVIEW_INTERVAL=0.5 kview kubectl get pods -A"
+drain 90  # the first fetch
+zpty -w -n t $'\es'
+drain 6
+zpty -w -n t $'\r'
+drain 20
+zpty -w -n t $'\x14'
+for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+zpty -d t
+if [[ $(<$out) == 'kubectl get -n ns pods new-c ' ]]; then
+  print "ok   kview Alt-S is immediate: Enter 0.3s later, with 3s fetches, gives ${(q)$(<$out)}"
+else
+  print "FAIL kview Alt-S immediate: got ${(q)$(<$out)}"; fail=1
+fi
 
 # U: from a pod line to its owner (one lookup, against a fake cluster), and then R restarts it.
 cat >| $fake/kubectl <<'SH'

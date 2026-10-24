@@ -20,6 +20,7 @@
 //	kmdmode faults                 filter the kubectl table on stdin to its unhealthy rows
 //	kmdmode columns COL,...        keep only these columns (and NAMESPACE, NAME) of that table
 //	kmdmode columns --list [COL,...]  print its columns as "NAME on|off" for a picker
+//	kmdmode order name             sort that table's rows by namespace and name (kubectl's order)
 //	kmdmode init zsh               print the zsh plugin, for `source <(kmdmode init zsh)` in .zshrc
 //	kmdmode kview [-c COL,...] CMD...  the live view (the plugin's kview runs this)
 //	kmdmode glue                   print the version of the embedded zsh code
@@ -164,6 +165,11 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case len(args) == 2 && args[0] == "order" && args[1] == "name":
+		if err := orderByName(os.Stdin, os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
 	case len(args) == 1 && args[0] == "faults":
 		if err := faults(os.Stdin, os.Stdout); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -171,7 +177,7 @@ func main() {
 		}
 	default:
 		fmt.Fprintln(os.Stderr, "usage: kmdmode init zsh | kmdmode kview CMD... | kmdmode version")
-		fmt.Fprintln(os.Stderr, "internal, for the zsh plugin: kmdmode menu|up|api-resources|contexts|pick|select -- WORD... | kmdmode retype TYPE|context NAME -- WORD... | kmdmode apply|toggle KEY -- WORD... | kmdmode faults | kmdmode columns [--list] COL,...")
+		fmt.Fprintln(os.Stderr, "internal, for the zsh plugin: kmdmode menu|up|api-resources|contexts|pick|select -- WORD... | kmdmode retype TYPE|context NAME -- WORD... | kmdmode apply|toggle KEY -- WORD... | kmdmode faults | kmdmode columns [--list] COL,... | kmdmode order name")
 		os.Exit(2)
 	}
 }
