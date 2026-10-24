@@ -12,21 +12,15 @@
 # itself on the next prompt. Either prompt opens in kmdmode, so one key carries on. Esc leaves
 # with an empty one, or, when the columns or sort changed, with this view's command updated.
 #
-# kubectl output is colored through kubecolor when it is installed. Needs fzf 0.59+ (--wrap,
-# trigger), else falls back to watch. Runs as `kmdmode kview`, which embeds this script and sets
-# KMDMODE_BIN (and KMDMODE_FZF when an fzf sits next to the binary); run straight from a checkout,
-# it uses the checkout's bin/.
+# kubectl output is colored through kubecolor when it is installed. Uses the fzf built into kmdmode
+# (`kmdmode fzf`), unless KMDMODE_FZF names another, which then needs 0.59+ (--wrap, trigger).
+# Runs as `kmdmode kview`, which embeds this script and sets KMDMODE_BIN; run straight from a
+# checkout, it uses the checkout's bin/kmdmode.
 emulate -L zsh
 here=${0:A:h}
 bin=${KMDMODE_BIN:-$here/bin/kmdmode}
-fzf=$KMDMODE_FZF
-if [[ -z $fzf ]]; then
-  if [[ -z $KMDMODE_BIN && -x $here/bin/fzf ]]; then
-    fzf=$here/bin/fzf  # a checkout's own, from make
-  elif (( $+commands[fzf] )); then
-    fzf=fzf
-  fi
-fi
+local -a fzf=("$bin" fzf)
+[[ -n $KMDMODE_FZF ]] && fzf=($KMDMODE_FZF)
 
 # kview --pick-columns RUN: the Alt-L picker, run by fzf from inside a live view. Ticks what is
 # shown (or sane defaults), and writes the choice to RUN/columns for the view's filter.
@@ -65,11 +59,13 @@ mkcmd() {
 export KUBECOLOR_FORCE_COLORS=true  # kubecolor writes to fzf, not a terminal
 cmd=$(mkcmd $plain) cmd_age=$(mkcmd $plain $age)
 interval=${KVIEW_INTERVAL:-2}
-autoload -Uz is-at-least
-fzf_version=${${(s: :)"$($fzf --version 2>/dev/null)"}[1]}
-if [[ -z $fzf ]] || ! is-at-least 0.59 ${fzf_version:-0}; then
-  print -u2 "kview: needs fzf 0.59 or newer (found ${fzf_version:-none}); falling back to watch"
-  exec watch -n $interval -- $(mkcmd "$@")
+if [[ -n $KMDMODE_FZF ]]; then  # the built-in one is new enough; another must be checked
+  autoload -Uz is-at-least
+  fzf_version=${${(s: :)"$($fzf --version 2>/dev/null)"}[1]}
+  if ! is-at-least 0.59 ${fzf_version:-0}; then
+    print -u2 "kview: KMDMODE_FZF needs fzf 0.59 or newer (found ${fzf_version:-none}); falling back to watch"
+    exec watch -n $interval -- $(mkcmd "$@")
+  fi
 fi
 
 run=$(mktemp -d ${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/kview.XXXXXX)

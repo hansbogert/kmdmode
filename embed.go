@@ -20,6 +20,13 @@ var (
 	pluginZsh string
 	//go:embed kview
 	kviewZsh string
+	// The licenses of everything compiled in, kmdmode's own and those of fzf and its dependencies,
+	// whose terms require shipping them with the binary; `make THIRD_PARTY_LICENSES` regenerates
+	// the latter from the module cache.
+	//go:embed LICENSE
+	licenseText string
+	//go:embed THIRD_PARTY_LICENSES
+	thirdPartyLicenses string
 )
 
 // version is set by the release build (-ldflags "-X main.version=..."); a `go install ...@vX`
@@ -66,20 +73,14 @@ func shellQuote(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-// runKview runs the embedded kview script under zsh, telling it where this binary is, and the fzf
-// next to it if there is one (a dev checkout's bin/fzf); otherwise kview takes fzf from PATH.
+// runKview runs the embedded kview script under zsh, telling it where this binary is (for its
+// built-in fzf and helpers).
 func runKview(args []string) error {
 	zsh, err := exec.LookPath("zsh")
 	if err != nil {
 		return fmt.Errorf("kview needs zsh: %w", err)
 	}
-	exe := executable()
-	env := append(os.Environ(), "KMDMODE_BIN="+exe)
-	if fzf := filepath.Join(filepath.Dir(exe), "fzf"); os.Getenv("KMDMODE_FZF") == "" {
-		if st, err := os.Stat(fzf); err == nil && !st.IsDir() {
-			env = append(env, "KMDMODE_FZF="+fzf)
-		}
-	}
+	env := append(os.Environ(), "KMDMODE_BIN="+executable())
 	argv := append([]string{"zsh", "-c", kviewZsh, "kview"}, args...)
 	return syscall.Exec(zsh, argv, env)
 }

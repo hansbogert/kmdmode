@@ -23,6 +23,8 @@
 //	kmdmode order name             sort that table's rows by namespace and name (kubectl's order)
 //	kmdmode init zsh               print the zsh plugin, for `source <(kmdmode init zsh)` in .zshrc
 //	kmdmode kview [-c COL,...] CMD...  the live view (the plugin's kview runs this)
+//	kmdmode fzf ARGS...            the fzf built into kmdmode (kview and the pickers use it)
+//	kmdmode licenses               print the licenses of the code built into kmdmode
 //	kmdmode glue                   print the version of the embedded zsh code
 //	kmdmode version                print the release version
 package main
@@ -44,6 +46,10 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case len(args) >= 1 && args[0] == "fzf":
+		runFzf(args[1:])
+	case len(args) == 1 && args[0] == "licenses":
+		fmt.Print(licenseText + "\n" + thirdPartyLicenses)
 	case len(args) == 1 && args[0] == "glue":
 		fmt.Println(glueVersion())
 	case len(args) == 1 && (args[0] == "version" || args[0] == "--version"):
@@ -176,7 +182,7 @@ func main() {
 			os.Exit(1)
 		}
 	default:
-		fmt.Fprintln(os.Stderr, "usage: kmdmode init zsh | kmdmode kview CMD... | kmdmode version")
+		fmt.Fprintln(os.Stderr, "usage: kmdmode init zsh | kmdmode kview CMD... | kmdmode version | kmdmode licenses")
 		fmt.Fprintln(os.Stderr, "internal, for the zsh plugin: kmdmode menu|up|api-resources|contexts|pick|select -- WORD... | kmdmode retype TYPE|context NAME -- WORD... | kmdmode apply|toggle KEY -- WORD... | kmdmode faults | kmdmode columns [--list] COL,... | kmdmode order name")
 		os.Exit(2)
 	}

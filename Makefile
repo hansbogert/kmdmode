@@ -1,14 +1,24 @@
-bin/kmdmode: *.go go.mod kmdmode.plugin.zsh kview
+bin/kmdmode: *.go go.mod go.sum kmdmode.plugin.zsh kview LICENSE THIRD_PARTY_LICENSES
 	go build -o $@ .
 
-test: bin/kmdmode bin/fzf
+test: bin/kmdmode
 	go test ./...
 	./test.zsh
 
-# kview's tests need fzf 0.59+, newer than some distributions ship; this one is for the checkout
-# alone, not put on PATH.
-bin/fzf:
-	GOBIN=$(CURDIR)/bin go install github.com/junegunn/fzf@v0.74.4
+# The license of every module compiled into the binary (fzf and its dependencies), embedded and
+# shipped with releases, as their terms require. Regenerate after changing dependencies.
+THIRD_PARTY_LICENSES: go.mod go.sum
+	for os in linux darwin; do for arch in amd64 arm64; do \
+	  GOOS=$$os GOARCH=$$arch go list -deps \
+	    -f '{{with .Module}}{{if not .Main}}{{.Path}} {{.Version}} {{.Dir}}{{end}}{{end}}' .; \
+	done; done | sort -u | while read -r path version dir; do \
+	  printf '================================================================================\n'; \
+	  printf '%s %s\n\n' "$$path" "$$version"; \
+	  found=; for f in "$$dir"/LICENSE* "$$dir"/COPYING*; do \
+	    [ -f "$$f" ] && cat "$$f" && found=1; \
+	  done; [ -n "$$found" ] || echo "(no license file found)"; \
+	  printf '\n'; \
+	done > $@
 
 install:
 	go install .

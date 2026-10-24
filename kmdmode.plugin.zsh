@@ -282,8 +282,8 @@ _kmdmode_dispatch() {
 # apiextensions API registered) in fzf, below the prompt; sets REPLY to the chosen one. Called
 # directly, not in $(...): it redraws through zle, which a subshell can't.
 _kmdmode_pick_resource() {
-  local fzf=${_kmdmode_bin:h}/fzf types typ
-  [[ -x $fzf ]] || fzf=fzf
+  local types typ
+  local -a fzf=("$_kmdmode_bin" fzf)  # the fzf built into kmdmode
   _kmdmode_note "asking the cluster for its resource types…"
   types=$("$_kmdmode_bin" api-resources -- "${words[@]}") || return 1
   _kmdmode_clear  # fzf draws where the hint was
@@ -298,9 +298,8 @@ _kmdmode_pick_resource() {
 # C offers the kubeconfig's contexts in fzf below the prompt, headed by the one the line uses now;
 # sets REPLY to the chosen one. Only the line changes, not the kubeconfig's current context.
 _kmdmode_pick_context() {
-  local fzf=${_kmdmode_bin:h}/fzf ctx
-  local -a lines
-  [[ -x $fzf ]] || fzf=fzf
+  local ctx
+  local -a lines fzf=("$_kmdmode_bin" fzf)  # the fzf built into kmdmode
   lines=(${(f)"$("$_kmdmode_bin" contexts -- "${words[@]}")"}) || return 1
   _kmdmode_clear  # fzf draws where the hint was
   zle -R

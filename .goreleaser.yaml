@@ -10,7 +10,7 @@ builds:
 
 archives:
   - formats: [tar.gz]
-    files: [README.md, LICENSE*]
+    files: [README.md, LICENSE, THIRD_PARTY_LICENSES]
 
 checksum:
   name_template: checksums.txt

@@ -78,9 +78,9 @@ kmdmode. The hint says `[Esc] up` or `[Esc] exit`. **Enter** runs the line (in e
 
 ## Install
 
-Needs zsh 5.9+, kubectl, curl, and [fzf](https://github.com/junegunn/fzf) 0.59+ for `kview` (some
-distributions ship an older one, e.g. Ubuntu's 0.44; `go install github.com/junegunn/fzf@latest`
-or Homebrew have a current one). [kubecolor](https://github.com/kubecolor/kubecolor) is optional
+Needs zsh 5.9+, kubectl and curl (and Go 1.23+ to build it). [fzf](https://github.com/junegunn/fzf)
+is built in, at a version kview needs (0.59+, newer than some distributions ship), so whatever
+fzf you have, if any, is left alone. [kubecolor](https://github.com/kubecolor/kubecolor) is optional
 and colours kview.
 
 ```sh
@@ -171,8 +171,8 @@ is already in kmdmode, so one key carries on (e.g. l for logs of the picked pod)
 
 kview fetches outside fzf: a background loop runs CMD into a file and then tells fzf, over a
 private socket, to reload from that file. While a reload runs, fzf drops cursor keys and holds
-Enter, so it must never wait on kubectl. This needs fzf 0.59+, newer than some distributions ship;
-with an older one kview says so and falls back to `watch`.
+Enter, so it must never wait on kubectl. That needs fzf 0.59+, which is why kmdmode carries its own
+(`kmdmode fzf`); `KMDMODE_FZF` points kview at another, which must then be 0.59+.
 
 **ctrl-z** (as in k9s) toggles to faulty rows only, marked `[faults only]` in the header: a STATUS
 other than Running/Completed/Succeeded, or a READY count short of its total (which also catches
@@ -219,9 +219,9 @@ To add a mode, return it from `commandMode` in `line.go`.
 make test       # Go table tests plus a zpty-driven run of the real widget
 ```
 
-`make` builds `bin/kmdmode`, and `make test` also installs fzf v0.74.4 into `bin/` for kview's
-tests. To try a checkout without installing it, source the plugin from it: it then uses the
-checkout's `bin/`.
+`make` builds `bin/kmdmode`. After changing dependencies, `make THIRD_PARTY_LICENSES` regenerates
+the licenses of the modules compiled in (embedded, and shipped with releases). To try a checkout
+without installing it, source the plugin from it: it then uses the checkout's `bin/`.
 
 ```zsh
 source ~/src/kmdmode/kmdmode.plugin.zsh
@@ -233,3 +233,6 @@ Releases are built by [GoReleaser](https://goreleaser.com) from a `v*` tag
 ## License
 
 Copyright 2026 Hans van den Bogert. Licensed under the [Apache License, Version 2.0](LICENSE).
+
+The binary includes fzf and the modules it uses, under their own licenses (MIT, BSD-3-Clause):
+see [THIRD_PARTY_LICENSES](THIRD_PARTY_LICENSES), or `kmdmode licenses`.
