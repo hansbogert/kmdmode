@@ -14,6 +14,7 @@ typeset -g _kmdmode_glue=${_kmdmode_glue:-}
 kview() { "$_kmdmode_bin" kview "$@" }
 typeset -g _kmdmode_prev_keymap=main
 typeset -gF _kmdmode_esc_at=0  # when Esc was last pressed (EPOCHREALTIME)
+typeset -ga _kmdmode_undo      # the line before each change kmdmode made to it, for z
 zmodload zsh/datetime
 typeset -g _kmdmode_sub=  # the submenu shown: "options" ("-"), "resources" (":"), or none
 typeset -gi _kmdmode_shift=0  # words a leading alias added (see _kmdmode_words)
@@ -71,6 +72,13 @@ _kmdmode_color_verb() {
   region_highlight+=("$pos $(( pos + $#tok )) fg=cyan,memo=kmdmode")
 }
 
+# Every change kmdmode makes to the line goes through here, so z can take it back.
+_kmdmode_change() {
+  _kmdmode_undo+=("$BUFFER")
+  BUFFER=$1
+  CURSOR=$#BUFFER
+}
+
 _kmdmode_leave() {
   zle -K $_kmdmode_prev_keymap
   _kmdmode_sub=
@@ -117,11 +125,13 @@ _kmdmode_render() {
   [[ -n $has_up ]] && esc=up
   # The mode's verb is the last word of its name, unless that is kubectl itself (no verb).
   [[ $name == *\ * && ${name##* } != kubectl ]] && ranges=("$(( $#head - ${#${name##* }} )) $#head")
+  local undo=
+  (( $#_kmdmode_undo )) && undo="  [z] undo"
   case $_kmdmode_sub in
-    options) head+=" -]" tail="  [Esc] up" ;;
-    resources) head+=" :]" tail="  [Esc] up" ;;
+    options) head+=" -]" tail="$undo  [Esc] up" ;;
+    resources) head+=" :]" tail="$undo  [Esc] up" ;;
     *) head+="]"
-       tail="${has_options:+  [-] options}${has_resources:+  [:] resource}  [Esc] $esc" ;;
+       tail="${has_options:+  [-] options}${has_resources:+  [:] resource}$undo  [Esc] $esc" ;;
   esac
   local r
   for r in $cyan; do  # counted within the list; shift them past the head
@@ -201,14 +211,24 @@ _kmdmode_dispatch() {
   if (( EPOCHREALTIME - _kmdmode_esc_at < 0.03 )) && [[ $KEYS == [\[O0-9\;A-D] ]]; then
     return
   fi
+  if [[ $KEYS == z ]]; then  # undo the last change kmdmode made to the line; stays in the menu
+    if (( $#_kmdmode_undo )); then
+      BUFFER=$_kmdmode_undo[-1]
+      CURSOR=$#BUFFER
+      shift -p _kmdmode_undo
+      _kmdmode_render "" quiet
+    else
+      _kmdmode_render "nothing to undo; "
+    fi
+    return
+  fi
   if [[ -z $_kmdmode_sub && $KEYS == C ]]; then  # case-sensitive: lowercase c is not context
     local -a words
     _kmdmode_words
     local out
     _kmdmode_pick_context || { _kmdmode_render; return }
     if out=$("$_kmdmode_bin" context "$REPLY" -- "${words[@]}"); then
-      BUFFER=$out
-      CURSOR=$#BUFFER
+      _kmdmode_change $out
     fi
     _kmdmode_render "" quiet
     return
@@ -230,8 +250,7 @@ _kmdmode_dispatch() {
     fi
     if out=$("$_kmdmode_bin" retype "$typ" -- "${words[@]}"); then
       _kmdmode_sub=
-      BUFFER=$out
-      CURSOR=$#BUFFER
+      _kmdmode_change $out
       _kmdmode_render "" quiet
     else
       _kmdmode_render "no '$KEYS' here; "
@@ -244,15 +263,13 @@ _kmdmode_dispatch() {
   if out=$("$_kmdmode_bin" ${${_kmdmode_sub:+toggle}:-apply} "$KEYS" -- "${words[@]}"); then
     if [[ $out == *= ]]; then
       # A line ending in "=" (S's --replicas=) waits for a value: hand the keyboard back.
-      BUFFER=$out
-      CURSOR=$#BUFFER
+      _kmdmode_change $out
       _kmdmode_leave
       return
     fi
     # Keep a trailing space so you can carry on typing arguments.
     [[ $BUFFER == *[[:space:]] ]] && out+=' '
-    BUFFER=$out
-    CURSOR=$#BUFFER
+    _kmdmode_change $out
     _kmdmode_render "" quiet
   elif [[ -z $_kmdmode_sub && $KEYS == u ]]; then
     _kmdmode_render "no owner found; "
@@ -301,7 +318,9 @@ _kmdmode_pick_context() {
 _kmdmode_complete() {
   local widget=${${(z)"$(bindkey -M $_kmdmode_prev_keymap '^I')"}[2]}
   _kmdmode_clear  # completion lists and pickers draw where the hint was
+  local before=$BUFFER
   zle ${widget:-expand-or-complete}
+  [[ $BUFFER != "$before" ]] && _kmdmode_undo+=("$before")
   _kmdmode_render "" quiet
 }
 
@@ -317,8 +336,7 @@ _kmdmode_escape() {
     _kmdmode_sub=
     _kmdmode_render
   elif parent=$("$_kmdmode_bin" up -- "${words[@]}"); then
-    BUFFER=$parent
-    CURSOR=$#BUFFER
+    _kmdmode_change $parent
     _kmdmode_render
   else
     # On a prompt kmdmode came back to, Esc means done with it: the untouched line goes too.
@@ -369,6 +387,7 @@ _kmdmode_line_finish() {
 }
 
 _kmdmode_line_init() {
+  _kmdmode_undo=()
   _kmdmode_returned=
   [[ -n $_kmdmode_picked ]] || return
   _kmdmode_picked=

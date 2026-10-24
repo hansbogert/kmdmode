@@ -63,6 +63,10 @@ headed by the one the line uses now, and sets `--context NAME` on the line: repl
 added right after `kubectl`. Only the line changes, not the kubeconfig's current context, so other
 terminals are unaffected. On a `kview` line it goes into the watched command.
 
+**z** undoes the last change kmdmode made to the line (an action, a toggle, `:`, `C`, Esc up, Tab),
+one at a time, staying in the menu you're in; the hint shows `[z] undo` while there is something
+to undo. The history lasts for the command line.
+
 **Tab** completes as it does outside kmdmode (through whatever your normal keymap binds Tab to,
 e.g. fzf's or fzf-tab's completion) and then shows the menu for the completed line.
 

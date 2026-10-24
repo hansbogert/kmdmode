@@ -58,7 +58,7 @@ check "kubectl get pods p" "l-f" "kubectl logs p -f" "[f] -f*  [p]"
 check 'kubectl logs -f p' '-' 'kubectl logs -f p' 'kmdmode [kubectl logs -]'
 check 'kubectl logs -f p' '-f'$'\e''g' 'kubectl get pod p'
 check 'kubectl -n ns ' o 'kview kubectl get pods -A -o wide ' 'kmdmode [kubectl]  [o] overview'
-check 'kubectl -n ns ' o 'kview kubectl get pods -A -o wide ' 'kmdmode [kview kubectl get]  [w] unwatch'
+check 'kubectl -n ns ' o 'kview kubectl get pods -A -o wide ' 'kmdmode [kview kubectl get]'
 check 'kubectl -n ns ' ow 'kubectl get pods -A -o wide '
 check 'kubectl -n ns ' $'o\e' 'kubectl get pods -A -o wide' '[Esc] up'  # watching is a menu below
 check 'kubectl get -n ns pods p -o wide' ':' 'kubectl get -n ns pods p -o wide' 'kmdmode [kubectl get :]  [p] pods'
@@ -73,6 +73,11 @@ check 'kubectl get deploy d -n ns' $'s\ek\e' 'kubectl get -n ns deploy/d'  # up 
 check 'kubectl get pods p' $'l-f\e\e' 'kubectl get pod p'  # up out of options, then up from logs
 check 'kubectl get pods p' $'l-f\e' 'kubectl logs p -f'  # Esc keeps the toggle: up, not undo
 check 'kubectl get pods p' $'l\e[A' 'kubectl get pod p' 'kmdmode [kubectl get]'  # an arrow acts as Esc, its [A dropped
+check 'kubectl get pods p' lz 'kubectl get pods p' '[z] undo'  # z takes back l; the hint offers it
+check 'kubectl get pods p' l-fz 'kubectl logs p' 'kmdmode [kubectl logs -]'  # z in the options list
+check 'kubectl get pods p' $'l\ez' 'kubectl logs p'  # Esc up is undoable too
+check 'kubectl get pods p' lzz 'kubectl get pods p' 'nothing to undo'
+check 'kubectl get pods p' z 'kubectl get pods p' 'nothing to undo' 
 check 'kubectl get pods p' $'l-f\r' 'kubectl logs p -f'  # ran, and came back in kmdmode
 # kview: under a real tty, the header stays pinned and the rows refresh.
 kv=$(mktemp)
