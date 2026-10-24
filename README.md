@@ -6,7 +6,7 @@ to a `rollout restart` or `scale`, plus a k9s-style live view (`kview`) of any l
 command lines you can read, edit and run, and that land in your shell history.
 
 ```sh
-go install github.com/OWNER/kmdmode@latest
+go install github.com/hansbogert/kmdmode@latest
 echo 'source <(kmdmode init zsh)' >> ~/.zshrc
 ```
 
@@ -79,7 +79,7 @@ or Homebrew have a current one). [kubecolor](https://github.com/kubecolor/kubeco
 and colours kview.
 
 ```sh
-go install github.com/OWNER/kmdmode@latest     # or a binary from the releases page
+go install github.com/hansbogert/kmdmode@latest     # or a binary from the releases page
 ```
 
 Then in `~/.zshrc`, after your other plugins load:
