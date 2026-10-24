@@ -375,12 +375,14 @@ var resourceKeys = []struct{ key, name string }{
 	{"c", "configmaps"}, {"e", "secrets"},
 }
 
-// retype lists another resource type where the line looks: the cluster flags, -n or -A, and -o
-// carry over; names, selectors and the rest belong to the old type.
+// retype lists another resource type where the line looks: the cluster flags, -n or -A, -o, and
+// the label selector carry over (an app's objects usually share its labels, so -l app=web finds
+// its deployments as well as its pods); names and field selectors belong to the old type.
 func (k kubectlCmd) retype(typ string) []string {
+	keep := set("--all-namespaces", "--output", "--selector")
 	k.flags = slices.DeleteFunc(slices.Clone(k.flags), func(f kflag) bool {
 		_, _, global := lookup("", f.long)
-		return !global && f.long != "--all-namespaces" && f.long != "--output"
+		return !global && !keep[f.long]
 	})
 	return k.rebuild("get", typ)
 }

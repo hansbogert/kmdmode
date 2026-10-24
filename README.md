@@ -34,7 +34,8 @@ With no kubectl command in recent history, it starts from the pods overview, as 
 (`kview kubectl get pods -A -o wide`), in kmdmode. Keys are case-sensitive and lowercase, except the ones you should not hit by accident: **C** (context), **D** (delete) and **Y** (confirming a delete).
 
 **`:`** switches the resource type the line lists, keeping where it looks (context, `-n`/`-A`,
-`-o`; names and selectors belong to the old type): `[p] pods  [d] deployments  [s] statefulsets
+`-o`) and its label selector (`-l app=web` finds that app's deployments too); names and field
+selectors belong to the old type: `[p] pods  [d] deployments  [s] statefulsets
 [a] daemonsets  [c] configmaps  [e] secrets`, or `[.] any…`, an fzf picker below the prompt over every listable type
 the line's cluster serves (`kubectl api-resources`, so built-ins and every CRD the apiextensions API
 registered, qualified like `certificates.cert-manager.io`). On a `kview` line it stays watched.
