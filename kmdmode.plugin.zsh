@@ -13,6 +13,8 @@ typeset -g _kmdmode_glue=${_kmdmode_glue:-}
 # kview runs from the binary, so it is never older than the binary.
 kview() { "$_kmdmode_bin" kview "$@" }
 typeset -g _kmdmode_prev_keymap=main
+typeset -gF _kmdmode_esc_at=0  # when Esc was last pressed (EPOCHREALTIME)
+zmodload zsh/datetime
 typeset -g _kmdmode_sub=  # the submenu shown: "options" ("-"), "resources" (":"), or none
 typeset -gi _kmdmode_shift=0  # words a leading alias added (see _kmdmode_words)
 
@@ -194,6 +196,11 @@ _kmdmode_enter() {
 }
 
 _kmdmode_dispatch() {
+  # The rest of an arrow key's escape sequence (ESC [ A, ESC O B, ESC [ 1 ; 5 C), which arrives
+  # within a few milliseconds of its Esc: drop it. See the bindings below.
+  if (( EPOCHREALTIME - _kmdmode_esc_at < 0.03 )) && [[ $KEYS == [\[O0-9\;A-D] ]]; then
+    return
+  fi
   if [[ -z $_kmdmode_sub && $KEYS == C ]]; then  # case-sensitive: lowercase c is not context
     local -a words
     _kmdmode_words
@@ -302,6 +309,7 @@ _kmdmode_complete() {
 # menu (logs, rollout, scale, describe, delete) to the get menu of the resource it acts on, then,
 # at a top menu, out of kmdmode.
 _kmdmode_escape() {
+  _kmdmode_esc_at=$EPOCHREALTIME
   local -a words
   local parent
   _kmdmode_words
@@ -384,10 +392,7 @@ bindkey -N kmdmode
 bindkey -M kmdmode -R ' '-'~' kmdmode-dispatch
 bindkey -M kmdmode '^[' kmdmode-escape '^M' kmdmode-run '^J' kmdmode-run '^G' kmdmode-leave
 bindkey -M kmdmode '^I' kmdmode-complete
-# Arrow keys are bound explicitly so their escape sequences leave whole, not as Esc + "[A".
-local _k
-for _k in '^[[A' '^[[B' '^[[C' '^[[D' '^[OA' '^[OB' '^[OC' '^[OD'; do
-  bindkey -M kmdmode $_k kmdmode-leave
-done
-unset _k
+# No bindings longer than Esc start with Esc here (the arrow keys' sequences): with one, zle waits
+# KEYTIMEOUT (0.4s by default) after every Esc for the rest. An arrow key now acts as Esc, one
+# menu up, and the dispatcher drops the rest of its sequence.
 bindkey ${KMDMODE_KEY:-'^[k'} kmdmode-enter

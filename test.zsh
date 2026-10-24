@@ -72,6 +72,7 @@ check 'kubectl get deploy d -n ns' $'r\ed' 'kubectl describe -n ns deploy/d'
 check 'kubectl get deploy d -n ns' $'s\ek\e' 'kubectl get -n ns deploy/d'  # up from S, which left kmdmode
 check 'kubectl get pods p' $'l-f\e\e' 'kubectl get pod p'  # up out of options, then up from logs
 check 'kubectl get pods p' $'l-f\e' 'kubectl logs p -f'  # Esc keeps the toggle: up, not undo
+check 'kubectl get pods p' $'l\e[A' 'kubectl get pod p' 'kmdmode [kubectl get]'  # an arrow acts as Esc, its [A dropped
 check 'kubectl get pods p' $'l-f\r' 'kubectl logs p -f'  # ran, and came back in kmdmode
 # kview: under a real tty, the header stays pinned and the rows refresh.
 kv=$(mktemp)
