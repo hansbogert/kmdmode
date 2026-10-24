@@ -196,7 +196,7 @@ func TestExecShell(t *testing.T) {
 		"kubectl exec --context c -n ns -it p -- sh": "kubectl --context c get -n ns pod p",
 		"kubectl exec -n ns -it deploy/web -- sh":    "kubectl get -n ns deploy/web",
 		// naming no pod: up to the pods list where it looks
-		"kubectl exec --context c -n tools -h":                   "kubectl --context c get -n tools pods",
+		"kubectl exec --context c -n tools -h":             "kubectl --context c get -n tools pods",
 		"kubectl exec --context c -n tools -it -l app=web": "kubectl --context c get -n tools pods",
 	} {
 		if out, ok := up(strings.Fields(in)); !ok || strings.Join(out, " ") != want {
