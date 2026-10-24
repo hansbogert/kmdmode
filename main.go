@@ -20,6 +20,10 @@
 //	cmdmode faults                 filter the kubectl table on stdin to its unhealthy rows
 //	cmdmode columns COL,...        keep only these columns (and NAMESPACE, NAME) of that table
 //	cmdmode columns --list [COL,...]  print its columns as "NAME on|off" for a picker
+//	cmdmode init zsh               print the zsh plugin, for `source <(cmdmode init zsh)` in .zshrc
+//	cmdmode kview [-c COL,...] CMD...  the live view (the plugin's kview runs this)
+//	cmdmode glue                   print the version of the embedded zsh code
+//	cmdmode version                print the release version
 package main
 
 import (
@@ -32,6 +36,17 @@ import (
 func main() {
 	args := os.Args[1:]
 	switch {
+	case len(args) == 2 && args[0] == "init" && args[1] == "zsh":
+		initZsh()
+	case len(args) >= 1 && args[0] == "kview":
+		if err := runKview(args[1:]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+	case len(args) == 1 && args[0] == "glue":
+		fmt.Println(glueVersion())
+	case len(args) == 1 && (args[0] == "version" || args[0] == "--version"):
+		fmt.Println(releaseVersion())
 	case len(args) >= 2 && args[0] == "menu" && args[1] == "--":
 		m, ok := modeFor(args[2:])
 		if !ok {
@@ -155,7 +170,8 @@ func main() {
 			os.Exit(1)
 		}
 	default:
-		fmt.Fprintln(os.Stderr, "usage: cmdmode menu|up|api-resources|contexts|pick|select -- WORD... | cmdmode retype TYPE|context NAME -- WORD... | cmdmode apply|toggle KEY -- WORD... | cmdmode faults | cmdmode columns [--list] COL,...")
+		fmt.Fprintln(os.Stderr, "usage: cmdmode init zsh | cmdmode kview CMD... | cmdmode version")
+		fmt.Fprintln(os.Stderr, "internal, for the zsh plugin: cmdmode menu|up|api-resources|contexts|pick|select -- WORD... | cmdmode retype TYPE|context NAME -- WORD... | cmdmode apply|toggle KEY -- WORD... | cmdmode faults | cmdmode columns [--list] COL,...")
 		os.Exit(2)
 	}
 }

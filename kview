@@ -12,14 +12,21 @@
 # itself on the next prompt. Either prompt opens in cmdmode, so one key carries on. Esc leaves
 # with an empty one, or, when the columns or sort changed, with this view's command updated.
 #
-# kubectl output is colored through kubecolor when it is installed. Uses the fzf that make
-# installs into bin/ (needs fzf 0.59+ for --wrap and trigger), else falls back to watch.
-# An executable rather than a plugin function, so shells loaded before an update and history
-# replayed outside an interactive shell find it too.
+# kubectl output is colored through kubecolor when it is installed. Needs fzf 0.59+ (--wrap,
+# trigger), else falls back to watch. Runs as `cmdmode kview`, which embeds this script and sets
+# CMDMODE_BIN (and CMDMODE_FZF when an fzf sits next to the binary); run straight from a checkout,
+# it uses the checkout's bin/.
 emulate -L zsh
 here=${0:A:h}
-fzf=$here/bin/fzf
-bin=$here/bin/cmdmode
+bin=${CMDMODE_BIN:-$here/bin/cmdmode}
+fzf=$CMDMODE_FZF
+if [[ -z $fzf ]]; then
+  if [[ -z $CMDMODE_BIN && -x $here/bin/fzf ]]; then
+    fzf=$here/bin/fzf  # a checkout's own, from make
+  elif (( $+commands[fzf] )); then
+    fzf=fzf
+  fi
+fi
 
 # kview --pick-columns RUN: the Alt-L picker, run by fzf from inside a live view. Ticks what is
 # shown (or sane defaults), and writes the choice to RUN/columns for the view's filter.
@@ -58,8 +65,10 @@ mkcmd() {
 export KUBECOLOR_FORCE_COLORS=true  # kubecolor writes to fzf, not a terminal
 cmd=$(mkcmd $plain) cmd_age=$(mkcmd $plain $age)
 interval=${KVIEW_INTERVAL:-2}
-if [[ ! -x $fzf ]]; then
-  print -u2 "kview: $fzf missing (run make in ${here}); falling back to watch"
+autoload -Uz is-at-least
+fzf_version=${${(s: :)"$($fzf --version 2>/dev/null)"}[1]}
+if [[ -z $fzf ]] || ! is-at-least 0.59 ${fzf_version:-0}; then
+  print -u2 "kview: needs fzf 0.59 or newer (found ${fzf_version:-none}); falling back to watch"
   exec watch -n $interval -- $(mkcmd "$@")
 fi
 
@@ -87,7 +96,7 @@ EOF
   opts+=(--expect=alt-enter
     --header="enter: pick  alt-enter: by labels  alt-l: columns  alt-s: by age  ctrl-z: faults  ctrl-r: refresh  esc: quit"
     --bind "ctrl-z:execute-silent([ -e $run/faults ] && rm -f $run/faults || touch $run/faults)+reload($show)"
-    --bind "alt-l:execute(${0:A} --pick-columns $run)+reload($show)"
+    --bind "alt-l:execute(${(q)bin} kview --pick-columns $run)+reload($show)"
     --bind "alt-s:execute-silent([ -e $run/sort ] && rm -f $run/sort || touch $run/sort; touch $run/now)")
 else
   print -r -- cat >| $run/filter

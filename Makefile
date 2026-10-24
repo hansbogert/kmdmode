@@ -1,16 +1,16 @@
-bin/cmdmode: *.go go.mod
+bin/cmdmode: *.go go.mod cmdmode.plugin.zsh kview
 	go build -o $@ .
 
 test: bin/cmdmode bin/fzf
 	go test ./...
 	./test.zsh
 
-# kview needs a newer fzf than distros ship; this one is for kview alone, not put on PATH.
+# kview's tests need fzf 0.59+, newer than some distributions ship; this one is for the checkout
+# alone, not put on PATH.
 bin/fzf:
 	GOBIN=$(CURDIR)/bin go install github.com/junegunn/fzf@v0.74.4
 
-install: bin/cmdmode bin/fzf
-	mkdir -p $(HOME)/.local/bin
-	ln -sf $(CURDIR)/kview $(HOME)/.local/bin/kview
+install:
+	go install .
 
 .PHONY: test install

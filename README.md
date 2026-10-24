@@ -1,8 +1,18 @@
 # cmdmode
 
-A zsh modal keymap that rewrites the command line you are typing into a related command.
+A modal keymap for zsh that turns the `kubectl` command you are typing into the next one you need,
+a key at a time: from a pod's `get` to its `logs`, `describe`, `exec` or owner, from a deployment
+to a `rollout restart` or `scale`, plus a k9s-style live view (`kview`) of any list, all as plain
+command lines you can read, edit and run, and that land in your shell history.
 
-Type `kubectl get pods -n ns pod1`, press **Alt-m**, and the message line names the mode and its
+```sh
+go install github.com/OWNER/cmdmode@latest
+echo 'source <(cmdmode init zsh)' >> ~/.zshrc
+```
+
+See [Install](#install) for the requirements.
+
+Type `kubectl get pods -n ns pod1`, press **Alt-k**, and the message line names the mode and its
 keys:
 
 ```
@@ -18,7 +28,7 @@ cmdmode [kubectl logs -]  [f] -f*  [p] -p  [t] --timestamps  [c] --all-container
 
 A line you **run from cmdmode** (Enter) comes back in cmdmode once it ends, e.g. after
 `kubectl logs -f` on ctrl-c, so the next key carries on from it; Esc on that returned line clears
-it. On an **empty prompt**, Alt-m brings back the most recent command (of the last 20) that has a
+it. On an **empty prompt**, Alt-k brings back the most recent command (of the last 20) that has a
 mode, so after `kubectl logs ...` ends you carry on from it; Esc on it goes back to the empty prompt.
 With no kubectl command in recent history, it starts from the pods overview, as o gives it
 (`kview kubectl get pods -A -o wide`), in cmdmode. Keys are case-sensitive and lowercase, except the ones you should not hit by accident: **C** (context), **D** (delete) and **Y** (confirming a delete).
@@ -63,25 +73,28 @@ cmdmode. The hint says `[Esc] up` or `[Esc] exit`. **Enter** runs the line (in e
 
 ## Install
 
-Needs zsh, Go 1.22+, curl and kubectl; [kubecolor](https://github.com/kubecolor/kubecolor) is
-optional (`go install github.com/kubecolor/kubecolor@v0.8.0`) and colors kview.
+Needs zsh 5.9+, kubectl, curl, and [fzf](https://github.com/junegunn/fzf) 0.59+ for `kview` (some
+distributions ship an older one, e.g. Ubuntu's 0.44; `go install github.com/junegunn/fzf@latest`
+or Homebrew have a current one). [kubecolor](https://github.com/kubecolor/kubecolor) is optional
+and colours kview.
 
 ```sh
-git clone <this repo> ~/src/cmdmode
-cd ~/src/cmdmode
-make install    # builds bin/cmdmode and bin/fzf (v0.74.4, for kview only), links kview into ~/.local/bin
+go install github.com/OWNER/cmdmode@latest     # or a binary from the releases page
 ```
 
-`~/.local/bin` must be on your PATH. Then in `~/.zshrc`, after your plugins load:
+Then in `~/.zshrc`, after your other plugins load:
 
 ```zsh
-source ~/src/cmdmode/cmdmode.plugin.zsh
+source <(cmdmode init zsh)
 ```
 
-and `exec zsh`. The plugin finds the helper next to itself, so any checkout path works. Set
-`CMDMODE_KEY` before sourcing to use another key than Alt-m (which replaces zsh's
-`copy-prev-shell-word`), and `CMDMODE_BIN` to point at the helper elsewhere. `make test` runs the
-Go tests and the zsh end-to-end tests.
+and `exec zsh`. `cmdmode init zsh` prints the zsh side from the binary, as `kubectl completion zsh`
+does, so the two always match. After an upgrade, shells already open re-read it on their next
+Alt-k.
+
+Press **Alt-k** on a `kubectl` line. Set `CMDMODE_KEY` before the `source` line for another key,
+e.g. `CMDMODE_KEY='^[m'` for Alt-m, and `CMDMODE_CONTEXT_FIRST=0` to skip choosing a context first.
+`kview` is available as a shell function, and as `cmdmode kview` everywhere else.
 
 ## How it works
 
@@ -137,7 +150,7 @@ all namespaces, `kview kubectl get <type> -A -o wide`. The type is the one `get`
 any line: only the flags that pick the cluster and identity (`--context`, `--kubeconfig`, `--as`,
 ...) carry over; names, `-n`, `-l` and other selectors, sorting and output flags reset.
 
-`kview CMD...` (a script, linked onto PATH by `make install`) shows CMD's output in fzf: scroll
+`kview CMD...` (`cmdmode kview` under the hood) shows CMD's output in fzf: scroll
 it, type to filter, the first line stays pinned as the header, and CMD re-runs `$KVIEW_INTERVAL`
 (default 2) seconds after each fetch. ctrl-r refreshes now, Esc leaves. kubectl output is colored
 through [kubecolor](https://github.com/kubecolor/kubecolor) when it is on PATH
@@ -153,9 +166,8 @@ is already in cmdmode, so one key carries on (e.g. l for logs of the picked pod)
 
 kview fetches outside fzf: a background loop runs CMD into a file and then tells fzf, over a
 private socket, to reload from that file. While a reload runs, fzf drops cursor keys and holds
-Enter, so it must never wait on kubectl. This needs a newer fzf than distros ship (0.59+), so
-`make` installs fzf v0.74.4 into `bin/` for kview alone; your fzf on PATH is untouched. Without
-it, kview falls back to `watch`.
+Enter, so it must never wait on kubectl. This needs fzf 0.59+, newer than some distributions ship;
+with an older one kview says so and falls back to `watch`.
 
 **ctrl-z** (as in k9s) toggles to faulty rows only, marked `[faults only]` in the header: a STATUS
 other than Running/Completed/Succeeded, or a READY count short of its total (which also catches
@@ -181,7 +193,7 @@ back in cmdmode on a get of everything of that type in the row's namespace carry
 (Shift-Enter would be nicer, but most terminals, GNOME Terminal included, send it as plain Enter.)
 
 **Enter** on a row puts a command for that resource on your next prompt, e.g. Enter on
-`kube-system coredns-x ...` gives `kubectl get -n kube-system pods coredns-x`, ready for Alt-m.
+`kube-system coredns-x ...` gives `kubectl get -n kube-system pods coredns-x`, ready for Alt-k.
 kview writes the line to `$CMDMODE_PICK_FILE` and the plugin's precmd hook loads it with
 `print -z`; without the plugin, kview prints the line instead.
 
@@ -196,8 +208,19 @@ The flag tables in `kubectl.go` come from `kubectl <sub> --help` and `kubectl op
 
 To add a mode, return it from `commandMode` in `line.go`.
 
-## Test
+## Development
 
 ```sh
 make test       # Go table tests plus a zpty-driven run of the real widget
 ```
+
+`make` builds `bin/cmdmode`, and `make test` also installs fzf v0.74.4 into `bin/` for kview's
+tests. To try a checkout without installing it, source the plugin from it: it then uses the
+checkout's `bin/`.
+
+```zsh
+source ~/src/cmdmode/cmdmode.plugin.zsh
+```
+
+Releases are built by [GoReleaser](https://goreleaser.com) from a `v*` tag
+(`.github/workflows/release.yml`); CI runs `make test` on every push.

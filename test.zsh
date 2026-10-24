@@ -20,7 +20,7 @@ check() {  # check LINE KEYS WANT [TEXT the hint (or a message) must show]
   zpty -w t "_dump() { print -rn -- \$POSTDISPLAY >| $out.hint; [[ -n \$BUFFER ]] && print -rn -- \$BUFFER >| $out }"
   zpty -w t "zle -N _dump; bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
   zpty -w t "kubectl() { print -rn -- \"ran: kubectl \$*\" >| $out }"
-  zpty -w -n t "$line"$'\em'"$keys"$'\x14'
+  zpty -w -n t "$line"$'\ek'"$keys"$'\x14'
   local i tty chunk
   for i in {1..50}; do [[ -s $out ]] && break; sleep 0.05; done
   while zpty -rt t chunk; do tty+=$chunk; done
@@ -69,7 +69,7 @@ check 'kubectl get deploy d -n ns' r 'kubectl rollout restart -n ns deploy/d' 'c
 check 'kubectl get deploy d -n ns ' s3 'kubectl scale -n ns deploy/d --replicas=3'  # S leaves cmdmode
 check 'kubectl get deploy d -n ns' $'r\e' 'kubectl get -n ns deploy/d' '[Esc] up'
 check 'kubectl get deploy d -n ns' $'r\ed' 'kubectl describe -n ns deploy/d'
-check 'kubectl get deploy d -n ns' $'s\em\e' 'kubectl get -n ns deploy/d'  # up from S, which left cmdmode
+check 'kubectl get deploy d -n ns' $'s\ek\e' 'kubectl get -n ns deploy/d'  # up from S, which left cmdmode
 check 'kubectl get pods p' $'l-f\e\e' 'kubectl get pod p'  # up out of options, then up from logs
 check 'kubectl get pods p' $'l-f\e' 'kubectl logs p -f'  # Esc keeps the toggle: up, not undo
 check 'kubectl get pods p' $'l-f\r' 'kubectl logs p -f'  # ran, and came back in cmdmode
@@ -193,7 +193,7 @@ zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M c
 zpty -w t "kubectl logs -n ns p --tail 5"
 zpty -w t "true"
 drain 10
-zpty -w -n t $'\em'g$'\x14'
+zpty -w -n t $'\ek'g$'\x14'
 for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
 zpty -d t
 if [[ $(<$out) == 'kubectl get -n ns pod p' ]]; then
@@ -209,7 +209,7 @@ zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
 zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh"
 zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
 drain 6
-zpty -w -n t $'\em'
+zpty -w -n t $'\ek'
 local screen chunk
 repeat 10 { while zpty -rt t chunk; do screen+=$chunk; done; sleep 0.05 }
 screen=$(plain $screen)
@@ -229,7 +229,7 @@ zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { :; }"
 zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
 zpty -w t "kubectl rollout restart -n ns deploy/d"
 drain 10
-zpty -w -n t $'\em't$'\x14'
+zpty -w -n t $'\ek't$'\x14'
 for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
 zpty -d t
 if [[ $(<$out) == 'kubectl rollout status -n ns deploy/d' ]]; then
@@ -246,7 +246,7 @@ for keys want in $'\e' '[kubectl get -n ns deploy/d]' $'\e\e' '[kubectl get -n n
   zpty -w t "_dump() { print -rn -- \"[\$BUFFER]\" >| $out }; zle -N _dump; bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
   zpty -w t "kubectl rollout restart -n ns deploy/d"
   drain 10
-  zpty -w -n t $'\em'$keys
+  zpty -w -n t $'\ek'$keys
   drain 12
   zpty -w -n t $'\x14'
   for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
@@ -268,7 +268,7 @@ for keys want in g 'kubectl get -n ns pod p' $'\e' 'kubectl get -n ns pod p'; do
   zpty -w t "_dump() { print -rn -- \"[\$BUFFER]\" >| $out }; zle -N _dump"
   zpty -w t "bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
   drain 10
-  zpty -w -n t "kubectl logs -n ns p"$'\em\r'
+  zpty -w -n t "kubectl logs -n ns p"$'\ek\r'
   drain 10
   zpty -w -n t "$keys"$'\x14'
   for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
@@ -361,7 +361,7 @@ zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$PATH
 zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh"
 zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
 drain 4
-zpty -w -n t "kubectl get -n ns pods web-7d9f8-x2k"$'\em'
+zpty -w -n t "kubectl get -n ns pods web-7d9f8-x2k"$'\ek'
 drain 4
 zpty -w -n t u
 drain 10
@@ -388,7 +388,7 @@ zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$PATH
 zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
 zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
 drain 4
-zpty -w -n t "kubectl get -n ns pods"$'\em'
+zpty -w -n t "kubectl get -n ns pods"$'\ek'
 drain 4
 zpty -w -n t ':.'
 drain 20
@@ -411,7 +411,7 @@ zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm PATH=$fake:$PATH
 zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
 zpty -w t "_dump() { print -rn -- \$POSTDISPLAY >| $out.hint; print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
 drain 4
-zpty -w -n t "kubectl get -n ns pods"$'\em'
+zpty -w -n t "kubectl get -n ns pods"$'\ek'
 drain 4
 zpty -w -n t ':.'
 drain 20
@@ -441,7 +441,7 @@ for keys want in C 'kubectl --context prod get -n ns pods' c 'kubectl get -n ns 
   zpty -w t "stty rows 20 cols 100; PS1='> '; source $root/cmdmode.plugin.zsh"
   zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M cmdmode '^T' _dump"
   drain 4
-  zpty -w -n t "kubectl get -n ns pods"$'\em'
+  zpty -w -n t "kubectl get -n ns pods"$'\ek'
   drain 4
   zpty -w -n t $keys
   drain 20
@@ -471,7 +471,7 @@ for keys want in $'\r' 'kubectl --context mgmt get -n ns pods' $'\e' 'kubectl ge
   zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump"
   zpty -w t "bindkey '^T' _dump; bindkey -M cmdmode '^T' _dump"
   drain 4
-  zpty -w -n t "kubectl get -n ns pods"$'\em'
+  zpty -w -n t "kubectl get -n ns pods"$'\ek'
   drain 20
   zpty -w -n t $keys
   drain 12
@@ -491,7 +491,7 @@ for keys ran in Y 'delete -n ns pods p' y ''; do
   zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
   zpty -w t "PS1='> '; source $root/cmdmode.plugin.zsh; kubectl() { print -rn -- \"\$*\" >| $out.ran }"
   drain 4
-  zpty -w -n t "kubectl get -n ns pods p"$'\em'
+  zpty -w -n t "kubectl get -n ns pods p"$'\ek'
   drain 4
   local screen= asked= chunk
   zpty -w -n t $'D\r'
@@ -505,6 +505,33 @@ for keys ran in Y 'delete -n ns pods p' y ''; do
     print "ok   delete confirm ${keys}: ran ${(q)got}"
   else
     print "FAIL delete confirm ${keys}: ran ${(q)got}, want ${(q)ran}"; fail=1
+  fi
+done
+
+# The release path: `source <(cmdmode init zsh)` gives a working cmdmode and a kview function, and a
+# shell holding an older glue version re-reads the plugin from the binary on Alt-k.
+for case in fresh stale; do
+  : >| $out
+  zpty -b t "env -i CMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
+  zpty -w t "PS1='> '; source <($root/bin/cmdmode init zsh)"
+  [[ $case == stale ]] && zpty -w t "_cmdmode_glue=0ld"
+  # Dump from the normal keymap: the reload re-creates the cmdmode one, dropping a test binding.
+  zpty -w t "_dump() { print -rn -- \"\$BUFFER|\$_cmdmode_glue|\$(whence -w kview)\" >| $out }; zle -N _dump; bindkey '^T' _dump"
+  drain 4
+  zpty -w -n t "kubectl get -n ns pods p"$'\ekl'
+  drain 6
+  zpty -w -n t $'\e'
+  drain 12
+  zpty -w -n t $'\e'
+  drain 12
+  zpty -w -n t $'\x14'
+  for i in {1..40}; do [[ -s $out ]] && break; drain 1; done
+  zpty -d t
+  want="kubectl get -n ns pod p|$($root/bin/cmdmode glue)|kview: function"
+  if [[ $(<$out) == "$want" ]]; then
+    print "ok   init zsh, $case shell: ${(q)$(<$out)}"
+  else
+    print "FAIL init zsh, $case shell: got ${(q)$(<$out)}, want ${(q)want}"; fail=1
   fi
 done
 

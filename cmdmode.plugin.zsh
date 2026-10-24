@@ -1,11 +1,17 @@
-# cmdmode: press $CMDMODE_KEY (default Alt-m) to enter a modal keymap that rewrites the current
-# command line, e.g. "kubectl get pods -n ns pod1" then L gives "kubectl logs -n ns pod1".
+# cmdmode: press $CMDMODE_KEY (default Alt-k) to enter a modal keymap that rewrites the current
+# command line, e.g. "kubectl get pods -n ns pod1" then l gives "kubectl logs -n ns pod1".
 # The hint below the line names the mode ("kubectl get"); "-" lists that mode's flags to toggle,
 # ":" switches the resource type it lists. The verb, and the actions that change it, show in cyan.
 # The rewrite rules live in the Go helper; this file only owns the keymap and the buffer.
 
-typeset -g _cmdmode_bin=${CMDMODE_BIN:-${0:A:h}/bin/cmdmode}
+# `cmdmode init zsh` presets _cmdmode_bin (the binary that printed this) and _cmdmode_glue (its
+# version of this code); sourced straight from a checkout, it uses the checkout's bin/.
+typeset -g _cmdmode_bin=${CMDMODE_BIN:-${_cmdmode_bin:-${0:A:h}/bin/cmdmode}}
+typeset -g _cmdmode_glue=${_cmdmode_glue:-}
 [[ -x $_cmdmode_bin ]] || _cmdmode_bin=cmdmode
+
+# kview runs from the binary, so it is never older than the binary.
+kview() { "$_cmdmode_bin" kview "$@" }
 typeset -g _cmdmode_prev_keymap=main
 typeset -g _cmdmode_sub=  # the submenu shown: "options" ("-"), "resources" (":"), or none
 typeset -gi _cmdmode_shift=0  # words a leading alias added (see _cmdmode_words)
@@ -159,6 +165,14 @@ _cmdmode_recall() {
 # listed first, so keeping it is one Enter; Esc there leaves the line alone. CMDMODE_CONTEXT_FIRST=0
 # turns this off.
 _cmdmode_enter() {
+  # After an upgrade, a shell loaded before it re-reads this code from the binary first.
+  local glue
+  if [[ -n $_cmdmode_glue ]] && glue=$("$_cmdmode_bin" glue 2>/dev/null) &&
+      [[ -n $glue && $glue != $_cmdmode_glue ]]; then
+    eval "$("$_cmdmode_bin" init zsh)"
+    _cmdmode_enter "$@"
+    return
+  fi
   [[ -z ${BUFFER//[[:space:]]/} ]] && _cmdmode_recall
   if [[ ${CMDMODE_CONTEXT_FIRST:-1} != 0 ]]; then
     local -a words
@@ -376,4 +390,4 @@ for _k in '^[[A' '^[[B' '^[[C' '^[[D' '^[OA' '^[OB' '^[OC' '^[OD'; do
   bindkey -M cmdmode $_k cmdmode-leave
 done
 unset _k
-bindkey ${CMDMODE_KEY:-'^[m'} cmdmode-enter
+bindkey ${CMDMODE_KEY:-'^[k'} cmdmode-enter
