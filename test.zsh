@@ -49,6 +49,9 @@ check 'kubectl get pods p' L 'kubectl get pods p' "no 'L' here"  # keys are case
 check 'kubectl get -n ns pods p' x 'kubectl exec -n ns -it p -- sh' 'kmdmode [kubectl exec]'
 check 'kubectl get -f /us' $'\t' 'kubectl get -f /usr/' 'kmdmode [kubectl get]'  # Tab completes, still in kmdmode
 check 'kubectl get -n ns pods p' 'x' 'kubectl exec -n ns -it p -- sh' 'kmdmode [kubectl exec]  [b] bash'
+decode=\''go-template={{range $k, $v := .data}}{{$k}}: {{$v | base64decode}}{{"\n"}}{{end}}'\'
+check 'kubectl get -n ns secret db' v "kubectl get -n ns secret db -o $decode" 'kmdmode [kubectl get]'
+check "kubectl get -n ns secret db -o $decode" v 'kubectl get -n ns secret db' 'kmdmode [kubectl get]'
 check 'kubectl get -n ns pods p' 'xb' 'kubectl exec -n ns -it p -- bash' 'kmdmode [kubectl exec]  [b] sh'
 check 'kubectl get -n ns deploy web' x 'kubectl exec -n ns -it deploy/web -- sh' 'kmdmode [kubectl exec]  [b] bash'
 check 'kubectl get -n ns deploy web' $'x\e' 'kubectl get -n ns deploy/web'  # up from exec to the deployment
@@ -226,6 +229,28 @@ if [[ $screen == *'kview: no valid session: aws: Error when retrieving token'* &
 else
   print "FAIL kview, session expired: screen: ${(q)screen[-600,-1]}"; fail=1
 fi
+# Secrets: alt-d in a table of them shows the row's values, decoded, beside it; on one secret's
+# document it switches to them, and Enter gives back the decoded command.
+cat >| $fake/kubectl <<'SH'
+#!/bin/sh
+case "$*" in
+  *base64decode*) echo "password: hunter2"; echo "user: admin" ;;
+  *"-o yaml"*) printf 'apiVersion: v1\ndata:\n  password: aHVudGVyMg==\nkind: Secret\n' ;;
+  *) echo "NAMESPACE NAME TYPE DATA AGE"; echo "ns db Opaque 2 5d" ;;
+esac
+SH
+for c keys want in 'get secrets -A' $'\ed' 'password: hunter2' \
+    'get secret db -o yaml' $'\ed' 'kubectl get secret db -o '\''go-template='; do
+  print -r -- "stty rows 14 cols 120; export PATH=$fake:\$PATH; unset KMDMODE_PICK_FILE
+KVIEW_INTERVAL=0.5 $root/kview kubectl $c" >| $kv
+  screen=$( (sleep 1.5; printf $keys; sleep 1.5; printf '\r'; sleep 0.5) |
+    timeout 10 script -qfc "zsh -f $kv" /dev/null | sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')
+  if [[ $screen == *"$want"* ]]; then
+    print "ok   kview $c, alt-d: shows ${(q)want}"
+  else
+    print "FAIL kview $c, alt-d: never showed ${(q)want}: ${(q)screen[-400,-1]}"; fail=1
+  fi
+done
 # Alt-m on an empty prompt recalls the last command with a mode, skipping ones without.
 : >| $out
 zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"

@@ -352,6 +352,9 @@ func kubectlMode(cmd []string) (mode, bool) {
 			return out
 		}})
 	}
+	if a, ok := k.decodeAction(); ok {
+		m.actions = append(m.actions, a)
+	}
 	m.actions = append(m.actions, action{"o", "overview", k.overview})
 	for _, o := range kubectlOptions[k.sub] {
 		opt := k.option(o)

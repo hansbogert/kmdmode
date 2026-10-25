@@ -10,8 +10,9 @@
 # --sort-by=.metadata.creationTimestamp, reversed), Enter puts a command for the picked row (e.g.
 # "kubectl get -n NS pods NAME") on the next prompt, and Alt-Enter lets you tick the row's labels
 # for a get by selector instead (shift-enter can't be told apart from Enter in most terminals).
+# In a table of secrets, alt-d shows the picked row's values, decoded, beside it.
 # Anything else, like "kubectl describe", is a document: long lines wrap, and Enter puts CMD
-# itself on the next prompt. Either prompt opens in kmdmode, so one key carries on. Esc leaves
+# itself on the next prompt; for one secret, alt-d switches to its values, decoded, and back. Either prompt opens in kmdmode, so one key carries on. Esc leaves
 # with an empty one, or, when the columns or sort changed, with this view's command updated.
 #
 # kubectl output is colored through kubecolor when it is installed. Uses the fzf built into kmdmode
@@ -23,6 +24,18 @@ here=${0:A:h}
 bin=${KMDMODE_BIN:-$here/bin/kmdmode}
 local -a fzf=("$bin" fzf)
 [[ -n $KMDMODE_FZF ]] && fzf=($KMDMODE_FZF)
+
+# kview --decoded RUN ROW: alt-d's preview in a table of secrets: ROW's values, decoded (kmdmode's
+# v on the row's get), or why kubectl could not get them.
+if [[ $1 == --decoded ]]; then
+  run=$2
+  local -a cmd=(${(f)"$(<$run/cmd)"})
+  line=$($bin pick -- ${(q-)cmd} <<<$3) && line=$($bin apply v -- ${(z)line}) || exit 0
+  if ! eval "$line" </dev/null 2>| $run/decoded.err; then
+    print -r -- "kview: $($bin why < $run/decoded.err)"
+  fi
+  exit
+fi
 
 # kview --pick-columns RUN: the Alt-L picker, run by fzf from inside a live view. Ticks what is
 # shown (or sane defaults), and writes the choice to RUN/columns for the view's filter.
@@ -76,7 +89,8 @@ trap 'kill $ticker 2>/dev/null; rm -rf $run' EXIT
 # state files and reload, so they apply at once instead of on the next fetch.
 show="sh $run/filter < $run/raw"
 opts=(--ansi --track --header-lines=1 --layout=reverse --no-sort --info=inline --prompt="$* > ")
-if [[ $1 == kubectl && ${@[(I)get]} -gt 0 ]]; then
+local -a layout=(${(f)"$($bin kview-layout -- "$@")"})
+if [[ $layout[1] == table ]]; then
   # ctrl-z (as in k9s) shows only faulty rows while $run/faults exists; Alt-L writes the chosen
   # columns to $run/columns; Alt-S shows the newest first while $run/sort exists. Tables are always
   # fetched oldest first (--sort-by creationTimestamp), so Alt-S only reverses the rows, and
@@ -97,6 +111,12 @@ if [ -e $run/sort ]; then awk 'NR == 1 { print \$0 "  [newest first]"; next } 1'
 EOF
   fetch=$cmd_age
   keys="enter: pick  alt-enter: by labels  alt-l: columns  alt-s: by age  ctrl-z: faults  ctrl-r: refresh  esc: quit"
+  if [[ $layout[2] == decode ]]; then
+    print -rl -- "$@" >| $run/cmd
+    keys="enter: pick  alt-d: decoded  alt-enter: by labels  alt-l: columns  alt-s: by age  ctrl-z: faults  ctrl-r: refresh  esc: quit"
+    opts+=(--preview "${(qq)bin} kview --decoded $run {}" --preview-window=hidden,right,50%,wrap
+      --bind alt-d:toggle-preview)
+  fi
   opts+=(--expect=alt-enter --header=$keys
     --bind "ctrl-z:execute-silent([ -e $run/faults ] && rm -f $run/faults || touch $run/faults)+reload($show)"
     --bind "alt-l:execute(${(q)bin} kview --pick-columns $run)+reload($show)"
@@ -105,6 +125,13 @@ else
   print -r -- cat >| $run/filter
   fetch=$cmd document=1
   keys="enter: back to the prompt with it  ctrl-r: refresh  esc: quit"
+  if [[ $layout[2] == decode ]]; then
+    # alt-d fetches the other of v's views, decoded or not, from the next fetch (now) on.
+    other=$($bin apply v -- ${(q-)@})
+    cmd_other=$(mkcmd ${(Q)${(z)other}})
+    keys="enter: back to the prompt with it  alt-d: decode/encode  ctrl-r: refresh  esc: quit"
+    opts+=(--bind "alt-d:execute-silent([ -e $run/other ] && rm -f $run/other || touch $run/other; touch $run/now)")
+  fi
   opts+=(--wrap --header=$keys)
 fi
 # Refresh outside fzf: while a reload is running fzf drops cursor keys and holds Enter, so it
@@ -118,7 +145,9 @@ post() { curl -s --unix-socket $run/fzf.sock --data-binary "$1" http://localhost
 {
   delay=$interval failed=
   while :; do
-    if eval $fetch </dev/null >| $run/next 2>| $run/err; then
+    f=$fetch
+    [[ -e $run/other ]] && f=$cmd_other
+    if eval $f </dev/null >| $run/next 2>| $run/err; then
       mv $run/next $run/raw
       [[ -n $failed ]] && post "change-header:$keys"
       delay=$interval failed=
@@ -148,6 +177,8 @@ if (( rc == 130 )); then  # Esc is the normal way out, not a failure
   line="kview ${chosen:+-c ${(q-)chosen} }${(j: :)${(@q-)final}}"
 elif (( rc )); then
   exit $rc
+elif [[ -e $run/other ]]; then  # Enter on a document gives the command it shows
+  line=$other
 elif [[ -n $document ]]; then
   line=${(j: :)${(@q-)@}}
 else

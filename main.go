@@ -23,6 +23,7 @@
 //	kmdmode columns COL,...        keep only these columns (and NAMESPACE, NAME) of that table
 //	kmdmode columns --list [COL,...]  print its columns as "NAME on|off" for a picker
 //	kmdmode order name             sort that table's rows by namespace and name (kubectl's order)
+//	kmdmode kview-layout -- WORD...  print "table" or "document", then "decode" if alt-d applies
 //	kmdmode why                    print in one line why kubectl failed, from its stderr on stdin
 //	kmdmode init zsh               print the zsh plugin, for `source <(kmdmode init zsh)` in .zshrc
 //	kmdmode kview [-c COL,...] CMD...  the live view (the plugin's kview runs this)
@@ -182,6 +183,10 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case len(args) >= 2 && args[0] == "kview-layout" && args[1] == "--":
+		for _, l := range kviewLayout(args[2:]) {
+			fmt.Println(l)
+		}
 	case len(args) == 1 && args[0] == "why":
 		in, _ := io.ReadAll(os.Stdin)
 		fmt.Println(kubectlError(string(in)))
@@ -192,7 +197,7 @@ func main() {
 		}
 	default:
 		fmt.Fprintln(os.Stderr, "usage: kmdmode init zsh | kmdmode kview CMD... | kmdmode version | kmdmode licenses")
-		fmt.Fprintln(os.Stderr, "internal, for the zsh plugin: kmdmode menu|up|api-resources|contexts|pick|select -- WORD... | kmdmode retype TYPE|context NAME -- WORD... | kmdmode apply|toggle KEY -- WORD... | kmdmode faults | kmdmode why | kmdmode columns [--list] COL,... | kmdmode order name")
+		fmt.Fprintln(os.Stderr, "internal, for the zsh plugin: kmdmode menu|up|api-resources|contexts|pick|select -- WORD... | kmdmode retype TYPE|context NAME -- WORD... | kmdmode apply|toggle KEY -- WORD... | kmdmode faults | kmdmode why | kmdmode kview-layout -- WORD... | kmdmode columns [--list] COL,... | kmdmode order name")
 		os.Exit(2)
 	}
 }

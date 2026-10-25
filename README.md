@@ -141,6 +141,13 @@ short name are written kind.group, which kubectl resolves for any CRD). A Deploy
 its ReplicaSet's name (`<deployment>-<pod-template-hash>`), so a pod takes one call. Something you
 created yourself, like most Certificates, has no owner, and u says so.
 
+**v** (decode) on a line naming one secret shows its values, base64-decoded: `kubectl get -n ns
+secret db` → v → `kubectl get -n ns secret db -o 'go-template={{range $k, $v := .data}}{{$k}}:
+{{$v | base64decode}}{{"\n"}}{{end}}'`. That is kubectl's own `base64decode`, the same as piping
+each value through `base64 -d`, but it keeps the line a single kubectl command, which kmdmode and
+kview still understand. v on that line goes back. Only the command lands in your history, not the
+values.
+
 Delete is a capital **D**, like the other keys not to hit by accident (C, Y). **D is offered only when the line names
 specific resources** (`pods p`, `deploy/d`), never for a bare type, `-l`, `-A`, `--all` or `-f`,
 where it would delete everything that matches; from `logs`, only for a plain pod name, since
@@ -173,7 +180,11 @@ refreshes (its position, so a pod added or removed above it shifts which row tha
 name would block keys after each refresh and lose an Enter now and then), ctrl-z filters to
 faults, and
 Enter picks the row (below). Anything else, like `kubectl describe`, is a **document**: long lines
-wrap, and Enter puts the command itself back on the prompt. Either way the prompt it returns to
+wrap, and Enter puts the command itself back on the prompt. A `get` with `-o yaml`, `json`,
+`name` or a template is a document too. In a table of secrets, **alt-d** opens a pane beside it
+with the selected secret's values, decoded, fetched only while the pane is open; for one secret,
+alt-d switches the document between the secret and its decoded values (v's two views). Either way
+the prompt it returns to
 is already in kmdmode, so one key carries on (e.g. l for logs of the picked pod). **w** (watch) in a get or describe mode wraps the line in kview.
 
 kview fetches outside fzf: a background loop runs CMD into a file and then tells fzf, over a
