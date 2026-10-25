@@ -4,6 +4,10 @@
 emulate -L zsh
 zmodload zsh/zpty
 root=${0:A:h}
+# The plugin's kview runs the copy embedded in the binary, so a stale one tests old code.
+for f in $root/{*.go,go.mod,kmdmode.plugin.zsh,kview}; do
+  [[ $f -nt $root/bin/kmdmode ]] && { print -u2 "bin/kmdmode is older than ${f:t}: run make test"; exit 1 }
+done
 out=$(mktemp)
 fail=0
 
