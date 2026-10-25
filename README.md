@@ -118,11 +118,12 @@ The helper rewrites the last simple command that has an action, so env prefixes
 
 | Mode               | Actions                                       | Options (after `-`)                                    |
 |--------------------|-----------------------------------------------|--------------------------------------------------------|
-| `kubectl get`      | l logs, d describe, D delete, r restart, s scale, w watch, o overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A` (drops `-n`), l `--show-labels`, s sort by age |
-| `kubectl logs`     | g get, d describe, D delete, r restart, s scale, o overview | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
-| `kubectl describe` | l logs, g get, D delete, r restart, s scale, w watch, o overview | e `--show-events=false`                                |
+| `kubectl get`      | l logs, d describe, D delete, r restart, s scale, f forward, w watch, o overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A` (drops `-n`), l `--show-labels`, s sort by age |
+| `kubectl logs`     | g get, d describe, D delete, r restart, s scale, f forward, o overview | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
+| `kubectl describe` | l logs, g get, D delete, r restart, s scale, f forward, w watch, o overview | e `--show-events=false`                                |
 | `kubectl delete`   | l logs, g get, d describe, r restart, s scale, o overview |
-| `kubectl rollout ...`, `kubectl scale ...` | g get, d describe, l logs, r restart, s scale, t status (minus its own), o overview | |                                                        |
+| `kubectl rollout ...`, `kubectl scale ...` | g get, d describe, l logs, r restart, s scale, t status (minus its own), f forward, o overview | |
+| `kubectl port-forward` | g get, d describe, p local port, o overview | |                                                        |
 | any other `kubectl ...` | o overview                               |                                                        |
 | `kview kubectl ...` (after w or o) | w unwatch (drops kview)    | those of the kubectl command inside, kview kept        |
 
@@ -140,6 +141,17 @@ does), following ownerReferences up: pod → ReplicaSet → Deployment, pod → 
 short name are written kind.group, which kubectl resolves for any CRD). A Deployment is read off
 its ReplicaSet's name (`<deployment>-<pod-template-hash>`), so a pod takes one call. Something you
 created yourself, like most Certificates, has no owner, and u says so.
+
+**f** (forward) on a line naming one pod, service or workload writes a port-forward to it of the
+ports it declares, which it asks the cluster for on the keypress, like u: a service's ports, else
+its containers' (a workload's from its pod template). `kubectl get -n ns svc web` → f →
+`kubectl port-forward -n ns svc/web 8080:80 9090`. A port below 1024 is forwarded from 8000 above
+it (80 from 8080, 443 from 8443), so it needs no root; when that local port is also one it
+declares, kubectl picks a free one (`:80`). With no ports declared, the line ends after the target
+and the keyboard is yours to type them. Enter runs it, Ctrl-C ends it, and the line comes back in
+kmdmode, where g and d (and Esc) go back to the resource. For another local port, **p** (local
+port) there empties the first port's local side and hands back the keyboard with the cursor on
+it: `8080:80` → p → `|:80`, so typing `9000` gives `9000:80`.
 
 **v** (decode) on a line naming one secret shows its values, base64-decoded: `kubectl get -n ns
 secret db` → v → `kubectl get -n ns secret db -o 'go-template={{range $k, $v := .data}}{{$k}}:

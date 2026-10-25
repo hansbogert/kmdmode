@@ -23,7 +23,7 @@ type mode struct {
 
 // Keys of the actions that change the line's verb (logs, get, describe, delete, exec, rollout
 // restart, scale, rollout status), which the hint shows in cyan like the verb itself.
-var verbKeys = set("l", "g", "d", "D", "x", "r", "s", "t")
+var verbKeys = set("l", "g", "d", "D", "x", "r", "s", "t", "f")
 
 type action struct {
 	key   string

@@ -9,7 +9,8 @@
 //	                               names no --context, "verb IDX" for the index of the verb word;
 //	                               actions that change the verb end in a "verb" field
 //	kmdmode apply KEY -- WORD...   print the line after action KEY; exit 1 if it does not apply,
-//	                               printing why when a failed cluster lookup is the reason (u)
+//	                               printing why when a failed cluster lookup is the reason (u);
+//	                               a second line "cursor N" hands the keyboard back at N (p)
 //	kmdmode toggle KEY -- WORD...  print the line after toggling option KEY; exit 1 likewise
 //	kmdmode up -- WORD...          print the line of the parent menu; exit 1 at a top menu
 //	kmdmode retype TYPE|KEY -- WORD...  print the line listing another resource type (":" menu)
@@ -38,6 +39,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"unicode/utf8"
 )
 
 func main() {
@@ -100,7 +102,13 @@ func main() {
 			}
 			os.Exit(1)
 		}
-		fmt.Println(strings.Join(out, " "))
+		line := strings.Join(out, " ")
+		if i := strings.Index(line, cursorMark); i >= 0 {
+			line = strings.Replace(line, cursorMark, "", 1)
+			fmt.Printf("%s\ncursor\t%d\n", line, utf8.RuneCountInString(line[:i]))
+			return
+		}
+		fmt.Println(line)
 	case len(args) >= 2 && args[0] == "up" && args[1] == "--":
 		out, ok := up(args[2:])
 		if !ok {

@@ -104,6 +104,18 @@ check_env="PATH=$nosession:$PATH"
 check 'kubectl get pods p' u 'kubectl get pods p' 'no valid session: aws: Error when retrieving token'
 check 'kubectl get pods p' :. 'kubectl get pods p' 'no valid session: aws: Error when retrieving token'
 check_env=
+# f asks the cluster for the declared ports; without any, the keyboard comes back for typing them.
+ports=$(mktemp -d)
+cat >| $ports/kubectl <<'SH'
+#!/bin/sh
+case "$*" in *svc/web*) echo "80 9090" ;; esac
+SH
+chmod +x $ports/kubectl
+check_env="PATH=$ports:$PATH"
+check 'kubectl get -n ns svc web' f 'kubectl port-forward -n ns svc/web 8080:80 9090' 'kmdmode [kubectl port-forward]'
+check 'kubectl get pods bare' f 'kubectl port-forward pod/bare ' 'no ports declared'
+check 'kubectl port-forward -n ns svc/web 8080:80 9090' p9000 'kubectl port-forward -n ns svc/web 9000:80 9090' 'type the local port'
+check_env=
 # kview: under a real tty, the header stays pinned and the rows refresh.
 kv=$(mktemp)
 print -r -- "stty rows 20 cols 100
@@ -651,5 +663,5 @@ for case in fresh stale; do
   fi
 done
 
-rm -rf $out $out.ran $out.hint $kv $fake $nosession
+rm -rf $out $out.ran $out.hint $kv $fake $nosession $ports
 exit $fail

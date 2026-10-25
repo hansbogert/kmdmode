@@ -50,6 +50,8 @@ var kubectlFlagTables = map[string]flagTable{
 	"describe": parseFlagTable(`
 		-A --all-namespaces bool; - --chunk-size value; -f --filename value
 		-k --kustomize value; -R --recursive bool; -l --selector value; - --show-events bool`),
+	"port-forward": parseFlagTable(`
+		- --address value; - --pod-running-timeout value`),
 }
 
 // The option keys offered per mode. A flag with a value is "on" only with exactly that value.
@@ -303,6 +305,17 @@ func kubectlMode(cmd []string) (mode, bool) {
 			}
 			m.actions = append(m.actions, workloadActions(k, refs)...)
 		}
+	case "port-forward":
+		if args, ok := forwardResource(k); ok {
+			for _, v := range resourceVerbs[:2] { // get, describe
+				m.actions = append(m.actions, action{v.key, v.sub, func() []string {
+					return k.rebuild(v.sub, args...)
+				}})
+			}
+		}
+		if a, ok := k.localPortAction(); ok {
+			m.actions = append(m.actions, a)
+		}
 	case "logs":
 		if args, ok := logsResource(k); ok {
 			for _, v := range resourceVerbs {
@@ -353,6 +366,9 @@ func kubectlMode(cmd []string) (mode, bool) {
 		}})
 	}
 	if a, ok := k.decodeAction(); ok {
+		m.actions = append(m.actions, a)
+	}
+	if a, ok := k.forwardAction(); ok {
 		m.actions = append(m.actions, a)
 	}
 	m.actions = append(m.actions, action{"o", "overview", k.overview})
@@ -486,7 +502,7 @@ func (k kubectlCmd) shellAction() (action, bool) {
 }
 
 // parent is the menu above the line's: the get of the resource that a describe, delete, logs,
-// rollout or scale line acts on. A get line, a list and anything else are top menus (nil).
+// rollout, scale or port-forward line acts on. A get line, a list and anything else are top menus (nil).
 func (k kubectlCmd) parent() func() []string {
 	var args []string
 	switch k.sub {
@@ -507,6 +523,12 @@ func (k kubectlCmd) parent() func() []string {
 			return nil
 		}
 		args = refs
+	case "port-forward":
+		a, ok := forwardResource(k)
+		if !ok {
+			return nil
+		}
+		args = a
 	case "exec":
 		// Up to the pod it names, or, naming none (exec -h, a misplaced -l), the pods list where
 		// it looks. An "=" word is no pod name: exec has no -l, so a selector's value lands here.

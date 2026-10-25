@@ -265,21 +265,33 @@ _kmdmode_dispatch() {
     fi
     return
   fi
-  if [[ -z $_kmdmode_sub && $KEYS == u ]]; then  # u asks the cluster: say so while it does
-    _kmdmode_note "asking the cluster for the owner…"
+  if [[ -z $_kmdmode_sub && $KEYS == [uf] ]]; then  # u and f ask the cluster: say so meanwhile
+    local what=owner
+    [[ $KEYS == f ]] && what=ports
+    _kmdmode_note "asking the cluster for the $what…"
   fi
   if out=$("$_kmdmode_bin" ${${_kmdmode_sub:+toggle}:-apply} "$KEYS" -- "${words[@]}"); then
-    if [[ $out == *= ]]; then
-      # A line ending in "=" (S's --replicas=) waits for a value: hand the keyboard back.
+    if [[ $out == *$'\n'cursor$'\t'<-> ]]; then
+      # The action puts the cursor mid-line for typing there (p, before ":80"): hand it back.
+      _kmdmode_change ${out%%$'\n'*}
+      CURSOR=${out##*$'\t'}
+      _kmdmode_leave
+      zle -M "kmdmode: type the local port, then Enter"
+      return
+    fi
+    if [[ $out == *[=\ ] ]]; then
+      # A line ending in "=" (s's --replicas=) or a space (f without declared ports) waits for
+      # a value: hand the keyboard back.
       _kmdmode_change $out
       _kmdmode_leave
+      [[ $out == *\  ]] && zle -M "kmdmode: no ports declared; type them, e.g. 8080:80"
       return
     fi
     # Keep a trailing space so you can carry on typing arguments.
     [[ $BUFFER == *[[:space:]] ]] && out+=' '
     _kmdmode_change $out
     _kmdmode_render "" quiet
-  elif [[ -z $_kmdmode_sub && $KEYS == u && -n $out ]]; then
+  elif [[ -z $_kmdmode_sub && $KEYS == [uf] && -n $out ]]; then
     _kmdmode_render "$out"$'\n'  # why the cluster could not tell
   elif [[ -z $_kmdmode_sub && $KEYS == u ]]; then
     _kmdmode_render "no owner found; "
