@@ -163,7 +163,8 @@ any line: only the flags that pick the cluster and identity (`--context`, `--kub
 ...) carry over; names, `-n`, `-l` and other selectors, sorting and output flags reset.
 
 `kview CMD...` (`kmdmode kview` under the hood) shows CMD's output in fzf: scroll
-it, type to filter, the first line stays pinned as the header, and CMD re-runs `$KVIEW_INTERVAL`
+it, type to filter (substrings, in the output's order: fzf's `--exact`, where `'term` is fuzzy
+again), the first line stays pinned as the header, and CMD re-runs `$KVIEW_INTERVAL`
 (default 2) seconds after each fetch. ctrl-r refreshes now, Esc leaves. kubectl output is colored
 through [kubecolor](https://github.com/kubecolor/kubecolor) when it is on PATH
 (`go install github.com/kubecolor/kubecolor@v0.8.0`).

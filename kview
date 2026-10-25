@@ -88,7 +88,9 @@ trap 'kill $ticker 2>/dev/null; rm -rf $run' EXIT
 # What fzf shows is $run/raw, the last fetch, through $run/filter. Toggles only change the filter's
 # state files and reload, so they apply at once instead of on the next fetch.
 show="sh $run/filter < $run/raw"
-opts=(--ansi --track --header-lines=1 --layout=reverse --no-sort --info=inline --prompt="$* > ")
+# --exact: rows stay in the command's order (--no-sort), so fuzzy matches, which only ranking
+# would push down, would crowd the real ones ("keeper" matching k..e..e..p..e..r across a row).
+opts=(--ansi --track --exact --header-lines=1 --layout=reverse --no-sort --info=inline --prompt="$* > ")
 local -a layout=(${(f)"$($bin kview-layout -- "$@")"})
 if [[ $layout[1] == table ]]; then
   # ctrl-z (as in k9s) shows only faulty rows while $run/faults exists; Alt-L writes the chosen

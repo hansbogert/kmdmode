@@ -251,6 +251,23 @@ KVIEW_INTERVAL=0.5 $root/kview kubectl $c" >| $kv
     print "FAIL kview $c, alt-d: never showed ${(q)want}: ${(q)screen[-400,-1]}"; fail=1
   fi
 done
+# Typing filters by substring: a row that only spells "keeper" out across its columns is not a
+# match, so Enter picks the keeper pod below it.
+cat >| $fake/kubectl <<'SH'
+#!/bin/sh
+echo "NAMESPACE NAME READY STATUS NODE"
+echo "kube-system kube-proxy-x 1/1 Running ip-10-0-1-5.eu-central-1.compute.internal"
+echo "clickhouse clickhouse-keeper-1 1/1 Running ip-10-0-1-6"
+SH
+print -r -- "stty rows 12 cols 100; export PATH=$fake:\$PATH; unset KMDMODE_PICK_FILE
+KVIEW_INTERVAL=0.5 $root/kview kubectl get pods -A" >| $kv
+got=$( (sleep 1; printf keeper; sleep 0.5; printf '\r'; sleep 0.5) | timeout 10 script -qfc "zsh -f $kv" /dev/null |
+  grep -aoE 'kubectl get -n [a-z-]+ pods [a-z0-9-]+' | tail -1)
+if [[ $got == 'kubectl get -n clickhouse pods clickhouse-keeper-1' ]]; then
+  print "ok   kview filter is a substring match: keeper picks ${(q)got}"
+else
+  print "FAIL kview filter: keeper picked ${(q)got}"; fail=1
+fi
 # Alt-m on an empty prompt recalls the last command with a mode, skipping ones without.
 : >| $out
 zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
