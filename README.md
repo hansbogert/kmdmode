@@ -75,6 +75,8 @@ e.g. fzf's or fzf-tab's completion) and then shows the menu for the completed li
 e.g. `kubectl rollout restart -n ns deploy/d` up to `kubectl get -n ns deploy/d`, and from a
 `kview ...` line (after w or o) to the plain command it watches, then, at a top menu, out of
 kmdmode. The hint says `[Esc] up` or `[Esc] exit`. **Enter** runs the line (in every menu, so the hint leaves it out).
+An **arrow key** leaves kmdmode at once, keeping the line and the cursor where they are, to edit
+it by hand (ctrl-g does the same).
 
 ## Install
 

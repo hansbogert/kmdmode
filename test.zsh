@@ -80,7 +80,11 @@ check 'kubectl get deploy d -n ns' $'r\ed' 'kubectl describe -n ns deploy/d'
 check 'kubectl get deploy d -n ns' $'s\ek\e' 'kubectl get -n ns deploy/d'  # up from S, which left kmdmode
 check 'kubectl get pods p' $'l-f\e\e' 'kubectl get pod p'  # up out of options, then up from logs
 check 'kubectl get pods p' $'l-f\e' 'kubectl logs p -f'  # Esc keeps the toggle: up, not undo
-check 'kubectl get pods p' $'l\e[A' 'kubectl get pod p' 'kmdmode [kubectl get]'  # an arrow acts as Esc, its [A dropped
+# An arrow key leaves kmdmode with the line and cursor as they are: typing goes in at the cursor.
+check 'kubectl get pods p' $'l\e[Dx' 'kubectl logs px'
+check 'kubectl get pods p' $'l\e[1;5Cx' 'kubectl logs px'
+check 'kubectl get pods p' $'l\eOCx' 'kubectl logs px'
+check 'kubectl get pods p' $'l\e' 'kubectl get pod p' 'kmdmode [kubectl get]'  # Esc alone: up
 check 'kubectl get pods p' lz 'kubectl get pods p' '[z] undo'  # z takes back l; the hint offers it
 check 'kubectl get pods p' l-fz 'kubectl logs p' 'kmdmode [kubectl logs -]'  # z in the options list
 check 'kubectl get pods p' $'l\ez' 'kubectl logs p'  # Esc up is undoable too

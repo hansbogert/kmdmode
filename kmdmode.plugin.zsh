@@ -13,9 +13,7 @@ typeset -g _kmdmode_glue=${_kmdmode_glue:-}
 # kview runs from the binary, so it is never older than the binary.
 kview() { "$_kmdmode_bin" kview "$@" }
 typeset -g _kmdmode_prev_keymap=main
-typeset -gF _kmdmode_esc_at=0  # when Esc was last pressed (EPOCHREALTIME)
 typeset -ga _kmdmode_undo      # the line before each change kmdmode made to it, for z
-zmodload zsh/datetime
 typeset -g _kmdmode_sub=  # the submenu shown: "options" ("-"), "resources" (":"), or none
 typeset -gi _kmdmode_shift=0  # words a leading alias added (see _kmdmode_words)
 
@@ -214,11 +212,6 @@ _kmdmode_enter() {
 }
 
 _kmdmode_dispatch() {
-  # The rest of an arrow key's escape sequence (ESC [ A, ESC O B, ESC [ 1 ; 5 C), which arrives
-  # within a few milliseconds of its Esc: drop it. See the bindings below.
-  if (( EPOCHREALTIME - _kmdmode_esc_at < 0.03 )) && [[ $KEYS == [\[O0-9\;A-D] ]]; then
-    return
-  fi
   if [[ $KEYS == z ]]; then  # undo the last change kmdmode made to the line; stays in the menu
     if (( $#_kmdmode_undo )); then
       BUFFER=$_kmdmode_undo[-1]
@@ -351,7 +344,22 @@ _kmdmode_complete() {
 # menu (logs, rollout, scale, describe, delete) to the get menu of the resource it acts on, then,
 # at a top menu, out of kmdmode.
 _kmdmode_escape() {
-  _kmdmode_esc_at=$EPOCHREALTIME
+  # An arrow key (or Home, End, ...) is Esc plus the rest of its sequence ("[C", "OC", "[1;5C")
+  # within a few milliseconds: it leaves kmdmode with the line and cursor as they are, to edit.
+  # Read here rather than bound: a binding longer than Esc makes zle wait KEYTIMEOUT after Esc.
+  local c seq
+  if read -s -t 0.03 -k 1 c; then
+    if [[ $c == [\[O] ]]; then
+      seq=$c
+      while (( $#seq < 2 )) || [[ $seq[-1] != [A-Za-z~] ]]; do
+        read -s -t 0.03 -k 1 c || break
+        seq+=$c
+      done
+      _kmdmode_leave
+      return
+    fi
+    zle -U -- "$c"  # a key typed right after Esc still counts, after it
+  fi
   local -a words
   local parent
   _kmdmode_words
@@ -435,6 +443,6 @@ bindkey -M kmdmode -R ' '-'~' kmdmode-dispatch
 bindkey -M kmdmode '^[' kmdmode-escape '^M' kmdmode-run '^J' kmdmode-run '^G' kmdmode-leave
 bindkey -M kmdmode '^I' kmdmode-complete
 # No bindings longer than Esc start with Esc here (the arrow keys' sequences): with one, zle waits
-# KEYTIMEOUT (0.4s by default) after every Esc for the rest. An arrow key now acts as Esc, one
-# menu up, and the dispatcher drops the rest of its sequence.
+# KEYTIMEOUT (0.4s by default) after every Esc for the rest. kmdmode-escape tells an arrow key
+# from Esc itself instead.
 bindkey ${KMDMODE_KEY:-'^[k'} kmdmode-enter
