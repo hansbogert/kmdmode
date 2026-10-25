@@ -714,6 +714,10 @@ func (k kubectlCmd) option(o optionSpec) option {
 		switch {
 		case on:
 			return k.splice(f.start, f.end, nil)
+		case o.long == "--all-namespaces":
+			// kubectl ignores -n under -A, so a -n left on the line would only mislead.
+			k, _ := parseKubectl(k.dropFlags("--namespace", "--all-namespaces"))
+			return k.splice(k.end, k.end, o.words)
 		case present:
 			return k.splice(f.start, f.end, o.words)
 		default:

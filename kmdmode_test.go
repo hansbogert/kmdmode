@@ -156,7 +156,12 @@ func TestToggle(t *testing.T) {
 		{"a", "kubectl get -n ns deploy/d", "kubectl get deploy -A"},
 		{"a", "kubectl get -n ns pods a b --context c", "kubectl --context c get pods -A"},
 		{"a", "kview kubectl get -n ns pods p", "kview kubectl get pods -A"},
-		{"a", "kubectl get -n ns pods", "kubectl get -n ns pods -A"},
+		// -A on a list: kubectl ignores -n then, so it goes too (z brings it back).
+		{"a", "kubectl get -n ns pods", "kubectl get pods -A"},
+		{"a", "kubectl -n ns get pods -l app=web", "kubectl get pods -l app=web -A"},
+		{"a", "kubectl get pods --namespace=ns -o wide", "kubectl get pods -o wide -A"},
+		{"a", "kubectl get pods -A=false -nns", "kubectl get pods -A"},
+		{"a", "kview kubectl get -n ns pods", "kview kubectl get pods -A"},
 		{"w", "kview kubectl get pods", "kview kubectl get pods -w"},
 		{"s", "kubectl get pods -A", "kubectl get pods -A --sort-by=.metadata.creationTimestamp"},
 		{"s", "kubectl get pods --sort-by=.metadata.creationTimestamp", "kubectl get pods"},

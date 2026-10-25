@@ -118,7 +118,7 @@ The helper rewrites the last simple command that has an action, so env prefixes
 
 | Mode               | Actions                                       | Options (after `-`)                                    |
 |--------------------|-----------------------------------------------|--------------------------------------------------------|
-| `kubectl get`      | l logs, d describe, D delete, r restart, s scale, w watch, o overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A`, l `--show-labels`, s sort by age |
+| `kubectl get`      | l logs, d describe, D delete, r restart, s scale, w watch, o overview | w `-w`, o `-o wide`, y `-o yaml`, a `-A` (drops `-n`), l `--show-labels`, s sort by age |
 | `kubectl logs`     | g get, d describe, D delete, r restart, s scale, o overview | f `-f`, p `-p`, t `--timestamps`, c `--all-containers`, x `--prefix`, n `--tail=100`, s `--since=1h` |
 | `kubectl describe` | l logs, g get, D delete, r restart, s scale, w watch, o overview | e `--show-events=false`                                |
 | `kubectl delete`   | l logs, g get, d describe, r restart, s scale, o overview |
