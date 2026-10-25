@@ -8,11 +8,13 @@
 //	                               "up" when it has a parent menu, "nocontext" when the line
 //	                               names no --context, "verb IDX" for the index of the verb word;
 //	                               actions that change the verb end in a "verb" field
-//	kmdmode apply KEY -- WORD...   print the line after action KEY; exit 1 if it does not apply
+//	kmdmode apply KEY -- WORD...   print the line after action KEY; exit 1 if it does not apply,
+//	                               printing why when a failed cluster lookup is the reason (u)
 //	kmdmode toggle KEY -- WORD...  print the line after toggling option KEY; exit 1 likewise
 //	kmdmode up -- WORD...          print the line of the parent menu; exit 1 at a top menu
 //	kmdmode retype TYPE|KEY -- WORD...  print the line listing another resource type (":" menu)
-//	kmdmode api-resources -- WORD...    print every listable resource type of the line's cluster
+//	kmdmode api-resources -- WORD...    print every listable resource type of the line's cluster,
+//	                                    or why it failed, with exit 1
 //	kmdmode contexts -- WORD...    print the context the line uses, then every kubeconfig context
 //	kmdmode context NAME -- WORD...  print the line using context NAME (C)
 //	kmdmode pick -- WORD...        print a command for the row on stdin, picked from WORD's output
@@ -21,6 +23,7 @@
 //	kmdmode columns COL,...        keep only these columns (and NAMESPACE, NAME) of that table
 //	kmdmode columns --list [COL,...]  print its columns as "NAME on|off" for a picker
 //	kmdmode order name             sort that table's rows by namespace and name (kubectl's order)
+//	kmdmode why                    print in one line why kubectl failed, from its stderr on stdin
 //	kmdmode init zsh               print the zsh plugin, for `source <(kmdmode init zsh)` in .zshrc
 //	kmdmode kview [-c COL,...] CMD...  the live view (the plugin's kview runs this)
 //	kmdmode fzf ARGS...            the fzf built into kmdmode (kview and the pickers use it)
@@ -91,6 +94,9 @@ func main() {
 	case len(args) >= 3 && (args[0] == "apply" || args[0] == "toggle") && args[2] == "--":
 		out, ok := run(args[1], args[0] == "toggle", args[3:])
 		if !ok {
+			if clusterErr != nil {
+				fmt.Println(clusterErr)
+			}
 			os.Exit(1)
 		}
 		fmt.Println(strings.Join(out, " "))
@@ -114,8 +120,8 @@ func main() {
 		// Discovery lists built-ins and every CRD the apiextensions API has registered; -o name
 		// qualifies the latter (certificates.cert-manager.io).
 		out, err := runKubectl(append(m.cluster, "--request-timeout=10s", "api-resources", "--verbs=list", "-o", "name"))
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
+		if err != nil { // on stdout, for the zsh side to show: stderr would land amid the prompt
+			fmt.Println(err)
 			os.Exit(1)
 		}
 		fmt.Print(out)
@@ -176,6 +182,9 @@ func main() {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
+	case len(args) == 1 && args[0] == "why":
+		in, _ := io.ReadAll(os.Stdin)
+		fmt.Println(kubectlError(string(in)))
 	case len(args) == 1 && args[0] == "faults":
 		if err := faults(os.Stdin, os.Stdout); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -183,7 +192,7 @@ func main() {
 		}
 	default:
 		fmt.Fprintln(os.Stderr, "usage: kmdmode init zsh | kmdmode kview CMD... | kmdmode version | kmdmode licenses")
-		fmt.Fprintln(os.Stderr, "internal, for the zsh plugin: kmdmode menu|up|api-resources|contexts|pick|select -- WORD... | kmdmode retype TYPE|context NAME -- WORD... | kmdmode apply|toggle KEY -- WORD... | kmdmode faults | kmdmode columns [--list] COL,... | kmdmode order name")
+		fmt.Fprintln(os.Stderr, "internal, for the zsh plugin: kmdmode menu|up|api-resources|contexts|pick|select -- WORD... | kmdmode retype TYPE|context NAME -- WORD... | kmdmode apply|toggle KEY -- WORD... | kmdmode faults | kmdmode why | kmdmode columns [--list] COL,... | kmdmode order name")
 		os.Exit(2)
 	}
 }

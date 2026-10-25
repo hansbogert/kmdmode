@@ -120,7 +120,13 @@ _kmdmode_render() {
         [[ $_kmdmode_sub == resources ]] && msg+="  [$f[2]] $f[3]" ;;
     esac
   done
-  local esc=exit tail head="${1}kmdmode [$name"
+  # A prefix ending in a newline (why the cluster could not answer) gets a line of its own above
+  # the menu, cut to the width; a short one ("no 'l' here; ") goes in front of it.
+  local note= esc=exit tail head="${1}kmdmode [$name"
+  if [[ $1 == *$'\n' ]]; then
+    note=$1 head="kmdmode [$name"
+    (( $#note <= COLUMNS )) || note="${note[1,COLUMNS-2]}…"$'\n'
+  fi
   local -a ranges
   [[ -n $has_up ]] && esc=up
   # The mode's verb is the last word of its name, unless that is kubectl itself (no verb).
@@ -134,6 +140,7 @@ _kmdmode_render() {
        tail="${has_options:+  [-] options}${has_resources:+  [:] resource}$undo  [Esc] $esc" ;;
   esac
   local r
+  local -a kept
   for r in $cyan; do  # counted within the list; shift them past the head
     ranges+=("$(( ${r% *} + $#head )) $(( ${r#* } + $#head ))")
   done
@@ -141,14 +148,15 @@ _kmdmode_render() {
   # When too wide, cut the list rather than the keys that always apply; colours stop at the cut.
   if (( $#msg + $#tail >= COLUMNS )); then
     local cut=$(( COLUMNS - $#tail - 2 ))
-    local -a kept
     msg="${msg[1,cut]}…"
     for r in $ranges; do
       (( ${r% *} < cut )) && kept+=("${r% *} $(( ${r#* } < cut ? ${r#* } : cut ))")
     done
     ranges=($kept)
   fi
-  _kmdmode_show "$msg$tail" $ranges
+  kept=()
+  for r in $ranges; do kept+=("$(( ${r% *} + $#note )) $(( ${r#* } + $#note ))"); done
+  _kmdmode_show "$note$msg$tail" $kept
   [[ -n $verb ]] && _kmdmode_color_verb $verb
 }
 
@@ -245,7 +253,7 @@ _kmdmode_dispatch() {
     typ=$KEYS
     if [[ $KEYS == . ]]; then
       # Cancelling the picker goes back to the main menu: the ":" list was only the way into it.
-      _kmdmode_pick_resource || { _kmdmode_sub=; _kmdmode_render; return }
+      _kmdmode_pick_resource || { _kmdmode_sub=; _kmdmode_render ${REPLY:+"$REPLY"$'\n'}; return }
       typ=$REPLY
     fi
     if out=$("$_kmdmode_bin" retype "$typ" -- "${words[@]}"); then
@@ -271,6 +279,8 @@ _kmdmode_dispatch() {
     [[ $BUFFER == *[[:space:]] ]] && out+=' '
     _kmdmode_change $out
     _kmdmode_render "" quiet
+  elif [[ -z $_kmdmode_sub && $KEYS == u && -n $out ]]; then
+    _kmdmode_render "$out"$'\n'  # why the cluster could not tell
   elif [[ -z $_kmdmode_sub && $KEYS == u ]]; then
     _kmdmode_render "no owner found; "
   else
@@ -279,13 +289,15 @@ _kmdmode_dispatch() {
 }
 
 # ":" then "." offers every resource type the line's cluster serves (built-ins and the CRDs the
-# apiextensions API registered) in fzf, below the prompt; sets REPLY to the chosen one. Called
-# directly, not in $(...): it redraws through zle, which a subshell can't.
+# apiextensions API registered) in fzf, below the prompt; sets REPLY to the chosen one, or on
+# failure to why the cluster could not list them. Called directly, not in $(...): it redraws
+# through zle, which a subshell can't.
 _kmdmode_pick_resource() {
   local types typ
   local -a fzf=("$_kmdmode_bin" fzf)  # the fzf built into kmdmode
   _kmdmode_note "asking the cluster for its resource types…"
-  types=$("$_kmdmode_bin" api-resources -- "${words[@]}") || return 1
+  REPLY=
+  types=$("$_kmdmode_bin" api-resources -- "${words[@]}") || { REPLY=$types; return 1 }
   _kmdmode_clear  # fzf draws where the hint was
   zle -R
   typ=$(print -r -- $types | $fzf --height=40% --layout=reverse --prompt="resource > " \

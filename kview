@@ -1,7 +1,9 @@
 #!/usr/bin/env zsh
 # kview [-c COL,...] CMD...: a k9s-style live view of CMD's output. Scroll and filter it in fzf with
 # the first line pinned as the header; CMD re-runs $KVIEW_INTERVAL (2) seconds after each refresh,
-# and the cursor keeps its place in the list across refreshes. ctrl-r refreshes now.
+# and the cursor keeps its place in the list across refreshes. ctrl-r refreshes now. When CMD
+# fails (no valid session, say), the header says why in one line, over the last output it gave, and
+# it retries less and less often, up to once a minute.
 #
 # "kubectl get" output is a table: ctrl-z shows only faulty rows (kmdmode faults), Alt-L picks
 # which columns to show (-c gives them up front), Alt-S sorts by age, newest first (kubectl's
@@ -54,7 +56,7 @@ sorted=
 mkcmd() {
   local -a v=("$@")
   [[ $1 == kubectl ]] && (( $+commands[kubecolor] )) && v[1]=kubecolor
-  print -r -- "${(j: :)${(@q-)v}} 2>&1"
+  print -r -- "${(j: :)${(@q-)v}}"
 }
 export KUBECOLOR_FORCE_COLORS=true  # kubecolor writes to fzf, not a terminal
 cmd=$(mkcmd $plain) cmd_age=$(mkcmd $plain $age)
@@ -64,7 +66,7 @@ if [[ -n $KMDMODE_FZF ]]; then  # the built-in one is new enough; another must b
   fzf_version=${${(s: :)"$($fzf --version 2>/dev/null)"}[1]}
   if ! is-at-least 0.59 ${fzf_version:-0}; then
     print -u2 "kview: KMDMODE_FZF needs fzf 0.59 or newer (found ${fzf_version:-none}); falling back to watch"
-    exec watch -n $interval -- $(mkcmd "$@")
+    exec watch -n $interval -- "$(mkcmd "$@") 2>&1"
   fi
 fi
 
@@ -94,27 +96,41 @@ fi |
 if [ -e $run/sort ]; then awk 'NR == 1 { print \$0 "  [newest first]"; next } 1'; else cat; fi
 EOF
   fetch=$cmd_age
-  opts+=(--expect=alt-enter
-    --header="enter: pick  alt-enter: by labels  alt-l: columns  alt-s: by age  ctrl-z: faults  ctrl-r: refresh  esc: quit"
+  keys="enter: pick  alt-enter: by labels  alt-l: columns  alt-s: by age  ctrl-z: faults  ctrl-r: refresh  esc: quit"
+  opts+=(--expect=alt-enter --header=$keys
     --bind "ctrl-z:execute-silent([ -e $run/faults ] && rm -f $run/faults || touch $run/faults)+reload($show)"
     --bind "alt-l:execute(${(q)bin} kview --pick-columns $run)+reload($show)"
     --bind "alt-s:execute-silent([ -e $run/sort ] && rm -f $run/sort || touch $run/sort)+reload($show)")
 else
   print -r -- cat >| $run/filter
   fetch=$cmd document=1
-  opts+=(--wrap --header="enter: back to the prompt with it  ctrl-r: refresh  esc: quit")
+  keys="enter: back to the prompt with it  ctrl-r: refresh  esc: quit"
+  opts+=(--wrap --header=$keys)
 fi
 # Refresh outside fzf: while a reload is running fzf drops cursor keys and holds Enter, so it
 # must never wait on kubectl. Likewise no --id-nth: matching the selected row by identity blocks
 # keys for a moment after every reload, so an Enter could be lost; --track alone keeps the
 # cursor's position instead. This ticker runs the command into $run/raw, then presses f12 over
 # fzf's private socket, which reloads from that file in milliseconds. It fetches at once, then
-# $interval seconds after each fetch, or sooner when ctrl-r touches $run/now.
+# $interval seconds after each fetch, or sooner when ctrl-r touches $run/now. stdin is /dev/null so
+# that a credential helper can't prompt into fzf's terminal; it fails instead, and says why.
+post() { curl -s --unix-socket $run/fzf.sock --data-binary "$1" http://localhost >/dev/null }
 {
+  delay=$interval failed=
   while :; do
-    eval $fetch >| $run/next && mv $run/next $run/raw
-    curl -s --unix-socket $run/fzf.sock -d 'trigger(f12)' http://localhost >/dev/null
-    for (( t = 0; t < interval * 10; t++ )); do [[ -e $run/now ]] && break; sleep 0.1; done
+    if eval $fetch </dev/null >| $run/next 2>| $run/err; then
+      mv $run/next $run/raw
+      [[ -n $failed ]] && post "change-header:$keys"
+      delay=$interval failed=
+    else
+      # Keep the last good output, unless this one has some; the first must exist for fzf.
+      [[ -s $run/next || ! -e $run/raw ]] && mv $run/next $run/raw
+      while [[ ! -S $run/fzf.sock ]]; do sleep 0.05; done  # the first fetch can beat fzf
+      post "change-header:"$'\e[31m'"kview: $($bin why < $run/err)"$'\e[0m\n'"retrying in $(printf %g $delay)s  $keys"
+      failed=1 delay=$(( delay * 2 > 60 ? 60 : delay * 2 ))
+    fi
+    post 'trigger(f12)'
+    for (( t = 0; t < delay * 10; t++ )); do [[ -e $run/now ]] && break; sleep 0.1; done
     rm -f $run/now
   done
 } &!

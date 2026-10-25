@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"os/exec"
 	"slices"
 	"strings"
@@ -18,13 +19,25 @@ var ownerKinds = map[string]string{
 // Kinds that are not owned by anything in practice, so the walk ends there without asking.
 var topKinds = set("deploy", "sts", "ds", "cronjob")
 
-// runKubectl runs kubectl and returns its stdout; tests replace it with a fake cluster.
+// runKubectl runs kubectl and returns its stdout, or an error that says in one line why it
+// failed; tests replace it with a fake cluster.
 var runKubectl = func(args []string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, "kubectl", args...).Output()
+	var exit *exec.ExitError
+	switch {
+	case ctx.Err() != nil:
+		err = errors.New("no answer from the cluster within 10s")
+	case errors.As(err, &exit):
+		err = errors.New(kubectlError(string(exit.Stderr)))
+	}
 	return string(out), err
 }
+
+// clusterErr says why the last lookup of the cluster failed, for a key that found nothing
+// because of it.
+var clusterErr error
 
 // singleResource returns the TYPE/NAME a line names, if it names exactly one resource:
 // "get/describe/delete TYPE NAME", "... TYPE/NAME", or "logs NAME" (a pod).
@@ -66,12 +79,15 @@ func (k kubectlCmd) owner(ref string) ([]string, bool) {
 	k.flags = slices.DeleteFunc(slices.Clone(k.flags), notGlobal)
 	flags := k.clusterFlags()
 	found := false
-	for range 4 {
+	for i := range 4 {
 		args := append(append([]string{}, flags...), "--request-timeout=5s", "get", ref, "-o",
 			"jsonpath={.metadata.ownerReferences[0].kind}|{.metadata.ownerReferences[0].apiVersion}"+
 				"|{.metadata.ownerReferences[0].name}|{.metadata.labels['pod-template-hash']}")
 		out, err := runKubectl(args)
 		if err != nil { // e.g. no access to the next owner up: stop at the last one found
+			if i == 0 {
+				clusterErr = err
+			}
 			break
 		}
 		parts := strings.Split(strings.TrimSpace(out), "|")

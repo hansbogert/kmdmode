@@ -161,6 +161,13 @@ it, type to filter, the first line stays pinned as the header, and CMD re-runs `
 through [kubecolor](https://github.com/kubecolor/kubecolor) when it is on PATH
 (`go install github.com/kubecolor/kubecolor@v0.8.0`).
 
+When CMD fails, for instance because the session to the cluster expired, the header says why in
+one line (the credential helper's own message, such as aws's "Token has expired"), over the last
+output that worked, and it retries less and less often, up to once a minute. CMD runs without the
+terminal as its input, so a login helper can't prompt into the view: log in again in another
+shell, then ctrl-r. Likewise `u` and `:` `.`, which ask the cluster, show why they couldn't on a
+line of their own above the menu.
+
 It has two layouts. `kubectl get` output is a **table**: the cursor keeps its place across
 refreshes (its position, so a pod added or removed above it shifts which row that is; matching by
 name would block keys after each refresh and lose an Enter now and then), ctrl-z filters to

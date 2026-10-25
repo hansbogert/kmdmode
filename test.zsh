@@ -10,10 +10,11 @@ fail=0
 # The terminal output without colour codes: the hint colours its verbs, which splits the text.
 plain() { print -r -- "$1" | sed 's/\x1b\[[0-9;]*m//g' }
 
+check_env=  # e.g. PATH=..., for the shell check starts
 check() {  # check LINE KEYS WANT [TEXT the hint (or a message) must show]
   local line=$1 keys=$2 want=$3 shows=$4
   : >| $out; : >| $out.hint
-  zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
+  zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm $check_env zsh -f -i"
   zpty -w t "PS1='> '; source $root/kmdmode.plugin.zsh; alias kgp='kubectl get pods'"
   # The hint is POSTDISPLAY, which zle redraws incrementally, so dump it rather than read it off
   # the terminal.
@@ -29,7 +30,7 @@ check() {  # check LINE KEYS WANT [TEXT the hint (or a message) must show]
   local name="${(q)line} + ${(q)keys}"
   if [[ $(<$out) != "$want" ]]; then
     print "FAIL $name: got ${(q)$(<$out)}, want ${(q)want}"; fail=1
-  elif [[ $tty == *(bad option|command not found|_kmdmode)* ]]; then
+  elif [[ $tty == *(bad option|command not found|_kmdmode|exit status|Unable to connect)* ]]; then
     print "FAIL $name: zsh error on the terminal: ${(q)tty}"; fail=1
   elif [[ -n $shows && $tty != *"$shows"* && $(<$out.hint) != *"$shows"* ]]; then
     print "FAIL $name: never showed ${(q)shows}; hint was ${(q)$(<$out.hint)}"; fail=1
@@ -79,6 +80,23 @@ check 'kubectl get pods p' $'l\ez' 'kubectl logs p'  # Esc up is undoable too
 check 'kubectl get pods p' lzz 'kubectl get pods p' 'nothing to undo'
 check 'kubectl get pods p' z 'kubectl get pods p' 'nothing to undo' 
 check 'kubectl get pods p' $'l-f\r' 'kubectl logs p -f'  # ran, and came back in kmdmode
+# Without a valid session, the keys that ask the cluster say why in the hint, in one line,
+# rather than letting kubectl's errors spill over the prompt.
+nosession=$(mktemp -d)
+cat >| $nosession/kubectl <<'SH'
+#!/bin/sh
+for i in 1 2 3; do
+  echo "Error when retrieving token from sso: Token has expired and refresh failed" >&2
+  echo 'E1025 08:03:09.594820 1791569 memcache.go:381] "Could not get current server API group list"' >&2
+done
+echo "Unable to connect to the server: getting credentials: exec: executable /usr/bin/aws failed with exit code 255" >&2
+exit 1
+SH
+chmod +x $nosession/kubectl
+check_env="PATH=$nosession:$PATH"
+check 'kubectl get pods p' u 'kubectl get pods p' 'no valid session: aws: Error when retrieving token'
+check 'kubectl get pods p' :. 'kubectl get pods p' 'no valid session: aws: Error when retrieving token'
+check_env=
 # kview: under a real tty, the header stays pinned and the rows refresh.
 kv=$(mktemp)
 print -r -- "stty rows 20 cols 100
@@ -191,6 +209,23 @@ if (( ticks >= 3 )); then
 else
   print "FAIL kview describe refreshes: $ticks versions seen"; fail=1
 fi
+# When the session expires, kview keeps the last table and says why in its header.
+cat >| $fake/kubectl <<SH
+#!/bin/sh
+[ -e $fake/expired ] && exec $nosession/kubectl
+touch $fake/expired
+echo "NAME READY STATUS"; echo "web-1 1/1 Running"
+SH
+print -r -- "stty rows 12 cols 120; export PATH=$fake:\$PATH
+KVIEW_INTERVAL=0.3 $root/kview kubectl get pods" >| $kv
+screen=$( (sleep 2; printf '\e'; sleep 0.5) | timeout 10 script -qfc "zsh -f $kv" /dev/null |
+  sed 's/\x1b\[[0-9;?]*[a-zA-Z]//g')
+if [[ $screen == *'kview: no valid session: aws: Error when retrieving token'* && $screen == *web-1* &&
+      $screen != *(E1025|Unable to connect)* ]]; then
+  print "ok   kview, session expired: last table kept, reason in the header"
+else
+  print "FAIL kview, session expired: screen: ${(q)screen[-600,-1]}"; fail=1
+fi
 # Alt-m on an empty prompt recalls the last command with a mode, skipping ones without.
 : >| $out
 zpty -b t "env -i KMDMODE_CONTEXT_FIRST=0 HOME=$HOME TERM=xterm zsh -f -i"
@@ -216,7 +251,7 @@ zpty -w t "PS1='> '; source $root/kmdmode.plugin.zsh"
 zpty -w t "_dump() { print -rn -- \$BUFFER >| $out }; zle -N _dump; bindkey -M kmdmode '^T' _dump"
 drain 6
 zpty -w -n t $'\ek'
-local screen chunk
+local screen= chunk=
 repeat 10 { while zpty -rt t chunk; do screen+=$chunk; done; sleep 0.05 }
 screen=$(plain $screen)
 zpty -w -n t $'\x14'
@@ -528,7 +563,7 @@ for keys ran in Y 'delete -n ns pods p' y ''; do
   drain 4
   zpty -w -n t "kubectl get -n ns pods p"$'\ek'
   drain 4
-  local screen= asked= chunk
+  local screen= asked= chunk=
   zpty -w -n t $'D\r'
   repeat 6 { while zpty -rt t chunk; do asked+=$chunk; done; sleep 0.05 }
   zpty -w -n t $keys
@@ -570,5 +605,5 @@ for case in fresh stale; do
   fi
 done
 
-rm -rf $out $out.ran $out.hint $kv $fake
+rm -rf $out $out.ran $out.hint $kv $fake $nosession
 exit $fail
