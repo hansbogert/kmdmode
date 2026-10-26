@@ -66,12 +66,15 @@ age=--sort-by=.metadata.creationTimestamp
 plain=(${@:#$age})
 sorted=
 (( ${@[(Ie)$age]} )) && sorted=1
+# kubecolor writes to fzf, not a terminal, so its colors are forced: by --force-colors, which the
+# original hidetatz/kubecolor (0.0.x, as some distributions ship it) knows too, unlike
+# KUBECOLOR_FORCE_COLORS.
 mkcmd() {
   local -a v=("$@")
   [[ $1 == kubectl ]] && (( $+commands[kubecolor] )) && v[1]=kubecolor
+  [[ $v[1] == kubecolor ]] && v[1]=(kubecolor --force-colors)
   print -r -- "${(j: :)${(@q-)v}}"
 }
-export KUBECOLOR_FORCE_COLORS=true  # kubecolor writes to fzf, not a terminal
 cmd=$(mkcmd $plain) cmd_age=$(mkcmd $plain $age)
 interval=${KVIEW_INTERVAL:-2}
 if [[ -n $KMDMODE_FZF ]]; then  # the built-in one is new enough; another must be checked
